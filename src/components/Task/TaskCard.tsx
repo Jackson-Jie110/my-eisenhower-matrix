@@ -1,3 +1,4 @@
+import React from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
 import { Trash2 } from "lucide-react";

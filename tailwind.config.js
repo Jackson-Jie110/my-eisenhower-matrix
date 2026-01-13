@@ -1,24 +1,34 @@
-import defaultTheme from "tailwindcss/defaultTheme";
-
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
-      colors: {
-        primary: "#3B82F6",
-        secondary: "#10B981",
-        accent: "#F59E0B",
-        muted: "#F3F4F6",
-      },
       fontFamily: {
-        sans: ["Outfit", ...defaultTheme.fontFamily.sans],
+        sans: ["Outfit", "sans-serif"],
       },
-      borderRadius: {
-        md: "6px",
-        lg: "8px",
-      },
+      // ÑÏ¸ñ¸´¿Ì Flat Design É«°å
+      colors: {
+        primary: {
+          DEFAULT: "#3B82F6", // Blue 500
+          foreground: "#FFFFFF",
+        },
+        secondary: {
+          DEFAULT: "#10B981", // Emerald 500
+          foreground: "#FFFFFF",
+        },
+        accent: {
+          DEFAULT: "#F59E0B", // Amber 500
+          foreground: "#FFFFFF",
+        },
+        muted: {
+          DEFAULT: "#F3F4F6", // Gray 100
+          foreground: "#111827",
+        }
+      }
     },
   },
   plugins: [],
-};
+}
