@@ -1,3 +1,5 @@
+import { CSS } from "@dnd-kit/utilities";
+import { useDraggable } from "@dnd-kit/core";
 import { Trash2 } from "lucide-react";
 
 import { cn } from "../../lib/utils";
@@ -9,11 +11,31 @@ type TaskCardProps = {
 };
 
 export function TaskCard({ task }: TaskCardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: task.id,
+    });
+
+  const translate = transform ? CSS.Translate.toString(transform) : "";
+  const style = {
+    transform: translate
+      ? `${translate}${isDragging ? " scale(1.05)" : ""}`
+      : isDragging
+        ? "scale(1.05)"
+        : undefined,
+  };
+
   return (
     <Card
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
       className={cn(
-        "group flex items-start justify-between gap-3",
-        task.isCompleted && "opacity-60"
+        "group relative flex items-start justify-between gap-3 transition-transform",
+        "cursor-grab active:cursor-grabbing",
+        task.isCompleted && "opacity-60",
+        isDragging && "opacity-50 z-50"
       )}
     >
       <div className="min-w-0">
