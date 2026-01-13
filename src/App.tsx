@@ -9,7 +9,9 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { Loader2, Sparkles } from "lucide-react";
 
+import { analyzeTasks } from "./lib/ai-client";
 import useTaskStore from "./hooks/useTaskStore";
 import type { QuadrantId, Task } from "./types";
 import { MatrixGrid } from "./components/Matrix/MatrixGrid";
@@ -81,9 +83,11 @@ function BacklogPanel({ tasks }: { tasks: Task[] }) {
 export default function App() {
   const tasks = useTaskStore((state) => state.tasks);
   const addTask = useTaskStore((state) => state.addTask);
+  const updateTaskQuadrant = useTaskStore((state) => state.updateTaskQuadrant);
 
   const [title, setTitle] = React.useState("");
   const [context, setContext] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
 
   const sensors = useSensors(
@@ -132,13 +136,31 @@ export default function App() {
     }
   };
 
+  const handleMagicSort = async () => {
+    if (isLoading || backlogTasks.length === 0) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { results } = await analyzeTasks(backlogTasks);
+      results.forEach((result) => {
+        if (isQuadrantId(result.quadrantId)) {
+          updateTaskQuadrant(result.id, result.quadrantId);
+        }
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Flat Matrix</h1>
           <p className="text-sm text-gray-600">
-            拖拽任务到象限，在象限间快速调整优先级。
+            拖拽任务到象限，或使用 Magic Sort 让 AI 智能分类。
           </p>
         </header>
 
@@ -162,9 +184,25 @@ export default function App() {
               value={context}
               onChange={(event) => setContext(event.target.value)}
             />
-            <Button type="submit" variant="primary">
-              Add
-            </Button>
+            <div className="flex flex-col gap-3 md:flex-row">
+              <Button type="submit" variant="primary">
+                Add
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleMagicSort}
+                disabled={isLoading || backlogTasks.length === 0}
+                className="flex items-center gap-2"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                <span>{isLoading ? "AI Thinking..." : "Magic Sort"}</span>
+              </Button>
+            </div>
           </form>
 
           <BacklogPanel tasks={backlogTasks} />
