@@ -104,7 +104,7 @@ const ArchiveCard = ({
       to={`/matrix/${entry.date}`}
       className={`rounded-2xl border p-4 text-slate-100 backdrop-blur-md transition-all hover:brightness-110 ${
         completed
-          ? "border-yellow-400/50 bg-glass-100/60 shadow-[0_0_24px_rgba(250,204,21,0.25)]"
+          ? "border-yellow-500 bg-glass-100/60 shadow-[0_0_15px_rgba(234,179,8,0.5)]"
           : "border-glass-border bg-glass-100/40"
       } ${highlight ? "ring-1 ring-white/30" : ""}`}
     >
@@ -208,9 +208,10 @@ export default function ArchivePage() {
 
   const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
-    if (value) {
-      navigate(`/matrix/${value}`);
+    if (!value) {
+      return;
     }
+    navigate(`/matrix/${value}`);
   };
 
   return (
@@ -246,7 +247,9 @@ export default function ArchivePage() {
               ref={dateInputRef}
               type="date"
               className={
-                supportsPicker ? "invisible absolute" : "absolute inset-0 opacity-0"
+                supportsPicker
+                  ? "invisible absolute inset-0 pointer-events-none"
+                  : "absolute inset-0 opacity-0"
               }
               onChange={handleDateChange}
             />
@@ -254,12 +257,14 @@ export default function ArchivePage() {
         </header>
 
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-200">今日</h2>
+          <h2 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-white/10 pb-2">
+            今日 (Today)
+          </h2>
           <ArchiveCard entry={todayEntry} highlight />
         </section>
 
         <section className="space-y-6">
-          <h2 className="text-sm font-semibold text-slate-200">历史档案</h2>
+          <h2 className="text-sm font-semibold text-slate-200">全部档案</h2>
           {sortedGroups.map(([month, dates]) => (
             <div key={month}>
               <h3 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-white/10 pb-2">
