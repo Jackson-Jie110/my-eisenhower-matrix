@@ -2,7 +2,7 @@ import React from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import { motion } from "framer-motion";
-import { CalendarPlus } from "lucide-react";
+import { ArrowRight, CalendarPlus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import type { Task } from "../types";
@@ -102,10 +102,10 @@ const ArchiveCard = ({
   return (
     <Link
       to={`/matrix/${entry.date}`}
-      className={`rounded-2xl border p-4 text-slate-100 backdrop-blur-md transition-all hover:brightness-110 ${
+      className={`rounded-2xl border bg-glass-100/40 p-4 text-slate-100 backdrop-blur-md transition-all hover:brightness-110 ${
         completed
-          ? "border-yellow-500 bg-glass-100/60 shadow-[0_0_15px_rgba(234,179,8,0.5)]"
-          : "border-glass-border bg-glass-100/40"
+          ? "border-[#EAB308] shadow-[0_0_20px_2px_rgba(234,179,8,0.4)]"
+          : "border-glass-border"
       } ${highlight ? "ring-1 ring-white/30" : ""}`}
     >
       <div className="flex items-center justify-between">
@@ -128,6 +128,7 @@ const ArchiveCard = ({
 export default function ArchivePage() {
   const [entries, setEntries] = React.useState<DateEntry[]>([]);
   const [supportsPicker, setSupportsPicker] = React.useState(false);
+  const [pendingDate, setPendingDate] = React.useState("");
   const today = dayjs().format("YYYY-MM-DD");
   const navigate = useNavigate();
   const dateInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -211,7 +212,14 @@ export default function ArchivePage() {
     if (!value) {
       return;
     }
-    navigate(`/matrix/${value}`);
+    setPendingDate(value);
+  };
+
+  const handleNavigateDate = () => {
+    if (!pendingDate) {
+      return;
+    }
+    navigate(`/matrix/${pendingDate}`);
   };
 
   return (
@@ -233,26 +241,42 @@ export default function ArchivePage() {
             </p>
             <h1 className="text-3xl font-semibold text-white">档案室</h1>
           </div>
-          <div className="relative flex items-center gap-3">
+          <div className="relative flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenPicker}
+                className="flex items-center gap-2"
+              >
+                <CalendarPlus className="h-4 w-4" />
+                新建 / 穿梭
+              </Button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                className={
+                  supportsPicker
+                    ? "invisible absolute inset-0 pointer-events-none"
+                    : "absolute inset-0 opacity-0"
+                }
+                onChange={handleDateChange}
+              />
+            </div>
             <Button
               type="button"
-              variant="outline"
-              onClick={handleOpenPicker}
-              className="flex items-center gap-2"
-            >
-              <CalendarPlus className="h-4 w-4" />
-              新建 / 穿梭
-            </Button>
-            <input
-              ref={dateInputRef}
-              type="date"
+              variant="ghost"
+              onClick={handleNavigateDate}
+              disabled={!pendingDate}
               className={
-                supportsPicker
-                  ? "invisible absolute inset-0 pointer-events-none"
-                  : "absolute inset-0 opacity-0"
+                pendingDate
+                  ? "flex items-center gap-2 border border-glass-border"
+                  : "flex items-center gap-2 border border-glass-border text-slate-500"
               }
-              onChange={handleDateChange}
-            />
+            >
+              <ArrowRight className="h-4 w-4" />
+              前往
+            </Button>
           </div>
         </header>
 
