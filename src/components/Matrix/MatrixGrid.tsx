@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import useTaskStore from "../../hooks/useTaskStore";
 import type { QuadrantId, Task } from "../../types";
 import { Quadrant } from "./Quadrant";
@@ -31,3 +31,4 @@ export function MatrixGrid() {
     </section>
   );
 }
+

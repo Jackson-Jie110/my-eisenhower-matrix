@@ -11,29 +11,18 @@ type QuadrantProps = {
   tasks: Task[];
 };
 
-const quadrantStyles: Record<
-  QuadrantId,
-  { container: string; title: string; over: string }
-> = {
+const quadrantStyles: Record<QuadrantId, { title: string }> = {
   q1: {
-    container: "bg-red-50",
-    title: "text-red-900",
-    over: "bg-red-100",
+    title: "text-neon-red",
   },
   q2: {
-    container: "bg-blue-50",
-    title: "text-blue-900",
-    over: "bg-blue-100",
+    title: "text-neon-blue",
   },
   q3: {
-    container: "bg-amber-50",
-    title: "text-amber-900",
-    over: "bg-amber-100",
+    title: "text-neon-yellow",
   },
   q4: {
-    container: "bg-gray-50",
-    title: "text-gray-900",
-    over: "bg-gray-100",
+    title: "text-neon-gray",
   },
 };
 
@@ -47,10 +36,9 @@ export function Quadrant({ title, quadrantId, tasks }: QuadrantProps) {
     <section
       ref={setNodeRef}
       className={cn(
-        "rounded-lg p-4 md:p-5 transition-colors",
+        "rounded-2xl border border-white/5 bg-glass-100/5 p-4 backdrop-blur-md transition-all md:p-5",
         "flex flex-col gap-3 min-h-[240px]",
-        styles.container,
-        isOver && styles.over
+        isOver && "border-white/20 bg-glass-200/40"
       )}
     >
       <h3 className={cn("text-sm font-bold tracking-tight", styles.title)}>
