@@ -13,6 +13,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import confetti from "canvas-confetti";
 
 import useTaskStore from "../hooks/useTaskStore";
 import type { QuadrantId, Task } from "../types";
@@ -89,6 +90,17 @@ function BacklogPanel({ tasks }: { tasks: Task[] }) {
   );
 }
 
+const getGreeting = () => {
+  const hour = dayjs().hour();
+  if (hour >= 5 && hour <= 11) {
+    return "早安，元气满满的一天 ☀️";
+  }
+  if (hour >= 12 && hour <= 18) {
+    return "下午好，保持专注 ☕";
+  }
+  return "晚上好，把烦恼留给明天 🌙";
+};
+
 export default function MatrixPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -110,6 +122,8 @@ export default function MatrixPage() {
   const [carryOverTasks, setCarryOverTasks] = React.useState<Task[]>([]);
   const [showCarryOver, setShowCarryOver] = React.useState(false);
   const [hasPrompted, setHasPrompted] = React.useState(false);
+
+  const prevIncompleteCount = React.useRef(0);
 
   const resolvedDate = React.useMemo(() => {
     const dateParam = params.date;
@@ -159,6 +173,18 @@ export default function MatrixPage() {
     }
     setHasPrompted(true);
   }, [checkYesterdayIncomplete, hasPrompted, isToday, tasks.length]);
+
+  React.useEffect(() => {
+    const incompleteCount = tasks.filter((task) => !task.isCompleted).length;
+    if (
+      prevIncompleteCount.current > 0 &&
+      incompleteCount === 0 &&
+      tasks.length > 0
+    ) {
+      confetti({ particleCount: 150, spread: 60, origin: { y: 0.6 } });
+    }
+    prevIncompleteCount.current = incompleteCount;
+  }, [tasks]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -227,8 +253,8 @@ export default function MatrixPage() {
               <ChevronLeft className="h-4 w-4" />
               返回
             </button>
-            <h1 className="text-3xl font-bold tracking-tight text-white">
-              时间矩阵
+            <h1 className="text-2xl font-semibold text-white">
+              {getGreeting()}
             </h1>
             <p className="text-sm text-slate-400">{currentDate}</p>
           </div>
@@ -291,7 +317,11 @@ export default function MatrixPage() {
               昨天还有 {carryOverTasks.length} 个任务未完成，要带到今天吗？
             </p>
             <div className="mt-6 flex gap-3">
-              <Button type="button" variant="primary" onClick={handleCarryOverConfirm}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleCarryOverConfirm}
+              >
                 导入任务
               </Button>
               <Button

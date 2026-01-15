@@ -2,8 +2,9 @@ import React from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import { motion } from "framer-motion";
-import { ArrowRight, CalendarPlus } from "lucide-react";
+import { ArrowRight, CalendarPlus, Download, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { saveAs } from "file-saver";
 
 import type { Task } from "../types";
 import { Button } from "../components/ui/Button";
@@ -132,6 +133,7 @@ export default function ArchivePage() {
   const today = dayjs().format("YYYY-MM-DD");
   const navigate = useNavigate();
   const dateInputRef = React.useRef<HTMLInputElement | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
     setSupportsPicker(
@@ -222,6 +224,55 @@ export default function ArchivePage() {
     navigate(`/matrix/${pendingDate}`);
   };
 
+  const handleExport = () => {
+    const data: Record<string, Task[]> = {};
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith("tasks_"))
+      .forEach((key) => {
+        data[key] = parseTasks(localStorage.getItem(key));
+      });
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    saveAs(blob, "flat-matrix-backup.json");
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const content = reader.result ? String(reader.result) : "";
+        const parsed = JSON.parse(content) as Record<string, Task[]>;
+        if (!parsed || typeof parsed !== "object") {
+          throw new Error("Invalid JSON");
+        }
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (!key.startsWith("tasks_")) {
+            return;
+          }
+          if (!Array.isArray(value)) {
+            return;
+          }
+          localStorage.setItem(key, JSON.stringify(value));
+        });
+        window.location.reload();
+      } catch {
+        window.alert("导入失败：文件格式不正确。请确认 JSON 结构。");
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  };
+
   return (
     <motion.div
       variants={pageMotion}
@@ -241,7 +292,32 @@ export default function ArchivePage() {
             </p>
             <h1 className="text-3xl font-semibold text-white">档案室</h1>
           </div>
-          <div className="relative flex flex-wrap items-center gap-3">
+          <div className="relative flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleExport}
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              导出
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleImportClick}
+              className="flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              导入
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={handleImportFile}
+            />
             <div className="relative">
               <Button
                 type="button"

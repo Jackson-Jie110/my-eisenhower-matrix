@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Trash2, ArrowRightCircle } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
 
@@ -15,6 +15,8 @@ type TaskCardProps = {
 export function TaskCard({ task }: TaskCardProps) {
   const deleteTask = useTaskStore((state) => state.deleteTask);
   const toggleTaskCompletion = useTaskStore((state) => state.toggleTaskCompletion);
+  const snoozeTask = useTaskStore((state) => state.snoozeTask);
+  const currentDate = useTaskStore((state) => state.currentDate);
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: task.id,
@@ -82,18 +84,34 @@ export function TaskCard({ task }: TaskCardProps) {
           </p>
         ) : null}
       </div>
-      <button
-        type="button"
-        className="opacity-0 transition-opacity duration-200 group-hover:opacity-100 text-slate-300 hover:text-white"
-        aria-label="删除任务"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          deleteTask(task.id);
-        }}
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      <div className="flex items-center gap-2">
+        {!task.isCompleted ? (
+          <button
+            type="button"
+            title="推迟到明天"
+            className="opacity-0 transition-opacity duration-200 group-hover:opacity-100 text-slate-300 hover:text-white"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              snoozeTask(task, currentDate);
+            }}
+          >
+            <ArrowRightCircle className="h-4 w-4" />
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="opacity-0 transition-opacity duration-200 group-hover:opacity-100 text-slate-300 hover:text-white"
+          aria-label="删除任务"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            deleteTask(task.id);
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
     </Card>
   );
 }

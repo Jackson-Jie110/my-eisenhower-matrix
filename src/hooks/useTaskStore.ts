@@ -15,6 +15,7 @@ type TaskStore = {
   clearAllTasks: () => void;
   loadTasksByDate: (date: string) => void;
   checkYesterdayIncomplete: () => Task[];
+  snoozeTask: (task: Task, currentDate: string) => void;
 };
 
 const STORAGE_PREFIX = "tasks_";
@@ -73,7 +74,9 @@ const migrateLegacyTasks = (today: string) => {
 
 const resolveDate = (date?: string) => {
   const target = date ? dayjs(date) : dayjs();
-  return target.isValid() ? target.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD");
+  return target.isValid()
+    ? target.format("YYYY-MM-DD")
+    : dayjs().format("YYYY-MM-DD");
 };
 
 const initializeStore = () => {
@@ -188,6 +191,24 @@ const useTaskStore = create<TaskStore>((set, get) => ({
     const yesterday = dayjs(currentDate).subtract(1, "day").format("YYYY-MM-DD");
     const tasks = parseTasks(localStorage.getItem(getStorageKey(yesterday)));
     return tasks.filter((task) => !task.isCompleted);
+  },
+  snoozeTask: (task, currentDate) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const todayKey = resolveDate(currentDate);
+    const tomorrow = dayjs(todayKey).add(1, "day").format("YYYY-MM-DD");
+
+    set((state) => {
+      const updatedToday = state.tasks.filter((item) => item.id !== task.id);
+      const tomorrowTasks = parseTasks(localStorage.getItem(getStorageKey(tomorrow)));
+      const updatedTomorrow = [...tomorrowTasks, { ...task }];
+
+      saveTasks(todayKey, updatedToday);
+      saveTasks(tomorrow, updatedTomorrow);
+
+      return { tasks: updatedToday };
+    });
   },
 }));
 
