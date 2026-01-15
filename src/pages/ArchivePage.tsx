@@ -21,11 +21,6 @@ type DateEntry = {
   completionRate: number;
 };
 
-type MonthGroup = {
-  label: string;
-  entries: DateEntry[];
-};
-
 dayjs.locale("zh-cn");
 
 const parseTasks = (raw: string | null) => {
@@ -63,7 +58,43 @@ const buildEntry = (date: string): DateEntry => {
   };
 };
 
-const ArchiveCard = ({ entry, highlight }: { entry: DateEntry; highlight?: boolean }) => {
+const seedMockData = () => {
+  const mockDates = [
+    dayjs().subtract(1, "day"),
+    dayjs().subtract(1, "month"),
+    dayjs().subtract(1, "year"),
+  ];
+
+  mockDates.forEach((date) => {
+    const formatted = date.format("YYYY-MM-DD");
+    const tasks: Task[] = [
+      {
+        id: `mock-${formatted}-1`,
+        title: "示例任务",
+        context: "来自开发环境的演示数据",
+        quadrantId: null,
+        isCompleted: false,
+        createdAt: date.valueOf(),
+      },
+      {
+        id: `mock-${formatted}-2`,
+        title: "已完成的示例任务",
+        quadrantId: "q2",
+        isCompleted: true,
+        createdAt: date.valueOf(),
+      },
+    ];
+    localStorage.setItem(`tasks_${formatted}`, JSON.stringify(tasks));
+  });
+};
+
+const ArchiveCard = ({
+  entry,
+  highlight,
+}: {
+  entry: DateEntry;
+  highlight?: boolean;
+}) => {
   const day = dayjs(entry.date).format("D日");
   const weekday = formatWeekday(entry.date);
   const completed = entry.completionRate >= 1 && entry.tasks.length > 0;
@@ -96,14 +127,30 @@ const ArchiveCard = ({ entry, highlight }: { entry: DateEntry; highlight?: boole
 
 export default function ArchivePage() {
   const [entries, setEntries] = React.useState<DateEntry[]>([]);
+  const [supportsPicker, setSupportsPicker] = React.useState(false);
   const today = dayjs().format("YYYY-MM-DD");
   const navigate = useNavigate();
   const dateInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
-    const keys = Object.keys(localStorage).filter((key) =>
+    setSupportsPicker(
+      typeof HTMLInputElement !== "undefined" &&
+        "showPicker" in HTMLInputElement.prototype
+    );
+  }, []);
+
+  React.useEffect(() => {
+    let keys = Object.keys(localStorage).filter((key) =>
       key.startsWith("tasks_")
     );
+
+    if (keys.length === 0 && import.meta.env.DEV) {
+      seedMockData();
+      keys = Object.keys(localStorage).filter((key) =>
+        key.startsWith("tasks_")
+      );
+    }
+
     const parsed = keys
       .map((key) => key.replace("tasks_", ""))
       .filter((date) => dayjs(date, "YYYY-MM-DD", true).isValid())
@@ -118,22 +165,20 @@ export default function ArchivePage() {
     return existing ?? buildEntry(today);
   }, [entries, today]);
 
-  const grouped = React.useMemo(() => {
-    const groups: Record<string, MonthGroup> = {};
-
+  const groupedTasks = React.useMemo(() => {
+    const groups: Record<string, DateEntry[]> = {};
     entries
       .filter((entry) => entry.date !== today)
       .forEach((entry) => {
-        const monthKey = dayjs(entry.date).format("YYYY-MM");
-        const label = dayjs(entry.date).format("YYYY年MM月");
-        if (!groups[monthKey]) {
-          groups[monthKey] = { label, entries: [] };
+        const label = dayjs(entry.date).format("YYYY年M月");
+        if (!groups[label]) {
+          groups[label] = [];
         }
-        groups[monthKey].entries.push(entry);
+        groups[label].push(entry);
       });
 
-    Object.keys(groups).forEach((key) => {
-      groups[key].entries = groups[key].entries.sort((a, b) =>
+    Object.keys(groups).forEach((label) => {
+      groups[label] = groups[label].sort((a, b) =>
         a.date < b.date ? 1 : -1
       );
     });
@@ -141,17 +186,22 @@ export default function ArchivePage() {
     return groups;
   }, [entries, today]);
 
-  const groupKeys = Object.keys(grouped).sort((a, b) => (a < b ? 1 : -1));
+  const sortedGroups = React.useMemo(
+    () =>
+      Object.entries(groupedTasks).sort((a, b) =>
+        dayjs(b[0], "YYYY年M月").valueOf() -
+        dayjs(a[0], "YYYY年M月").valueOf()
+      ),
+    [groupedTasks]
+  );
 
   const handleOpenPicker = () => {
     const input = dateInputRef.current;
     if (!input) {
       return;
     }
-    const picker = input as HTMLInputElement & { showPicker?: () => void };
-    if (picker.showPicker) {
-      picker.showPicker();
-    } else {
+    input.showPicker?.();
+    if (!supportsPicker) {
       input.click();
     }
   };
@@ -182,7 +232,7 @@ export default function ArchivePage() {
             </p>
             <h1 className="text-3xl font-semibold text-white">档案室</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="relative flex items-center gap-3">
             <Button
               type="button"
               variant="outline"
@@ -195,7 +245,9 @@ export default function ArchivePage() {
             <input
               ref={dateInputRef}
               type="date"
-              className="absolute -left-[9999px] opacity-0"
+              className={
+                supportsPicker ? "invisible absolute" : "absolute inset-0 opacity-0"
+              }
               onChange={handleDateChange}
             />
           </div>
@@ -208,27 +260,18 @@ export default function ArchivePage() {
 
         <section className="space-y-6">
           <h2 className="text-sm font-semibold text-slate-200">历史档案</h2>
-          {groupKeys.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              暂无历史记录，从今天开始记录你的时间矩阵。
-            </p>
-          ) : (
-            groupKeys.map((key) => (
-              <div key={key} className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <h3 className="text-sm font-semibold text-slate-200">
-                    {grouped[key].label}
-                  </h3>
-                  <span className="h-px flex-1 bg-white/10" />
-                </div>
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-                  {grouped[key].entries.map((entry) => (
-                    <ArchiveCard key={entry.date} entry={entry} />
-                  ))}
-                </div>
+          {sortedGroups.map(([month, dates]) => (
+            <div key={month}>
+              <h3 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-white/10 pb-2">
+                {month}
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {dates.map((entry) => (
+                  <ArchiveCard key={entry.date} entry={entry} />
+                ))}
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </section>
       </div>
     </motion.div>
