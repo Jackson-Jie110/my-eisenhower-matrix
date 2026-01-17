@@ -103,25 +103,45 @@ const ArchiveCard = ({
   return (
     <Link
       to={`/matrix/${entry.date}`}
-      className={`rounded-2xl border bg-glass-100/40 p-4 text-slate-100 backdrop-blur-md transition-all hover:brightness-110 ${
+      className={`group relative flex flex-col justify-between rounded-2xl border p-4 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:brightness-110 
+      ${
         completed
-          ? "border-[#EAB308] shadow-[0_0_20px_2px_rgba(234,179,8,0.4)]"
-          : "border-glass-border"
-      } ${highlight ? "ring-1 ring-white/30" : ""}`}
+          ? "bg-slate-900/80 border-[#EAB308] shadow-[0_0_20px_2px_rgba(234,179,8,0.4)]"
+          : "bg-slate-900/40 border-white/10 hover:border-white/20"
+      } 
+      ${highlight ? "ring-2 ring-blue-500/50" : ""}`}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-slate-300">{weekday}</p>
-          <p className="text-2xl font-semibold text-white">{day}</p>
+      <div className="flex items-start justify-between z-10 relative">
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-slate-400 group-hover:text-slate-200 transition-colors">
+            {weekday}
+          </span>
+          <span
+            className={`text-3xl font-bold mt-1 ${
+              completed ? "text-[#EAB308]" : "text-white"
+            }`}
+          >
+            {day}
+          </span>
         </div>
         <div className="text-right">
-          <p className="text-xs text-slate-400">完成率</p>
-          <p className="text-lg font-semibold text-white">
+          <span className="text-[10px] uppercase tracking-wider text-slate-500">
+            完成率
+          </span>
+          <p
+            className={`text-xl font-bold ${
+              completed ? "text-[#EAB308]" : "text-slate-200"
+            }`}
+          >
             {Math.round(entry.completionRate * 100)}%
           </p>
         </div>
       </div>
-      <p className="mt-3 text-xs text-slate-400">{entry.tasks.length} 项任务</p>
+      <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3 z-10 relative">
+        <span className="text-xs text-slate-500 group-hover:text-slate-400">
+          {entry.tasks.length} 项任务
+        </span>
+      </div>
     </Link>
   );
 };

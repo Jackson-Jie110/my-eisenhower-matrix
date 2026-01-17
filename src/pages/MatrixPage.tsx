@@ -37,6 +37,21 @@ const quadrantIds: QuadrantId[] = ["q1", "q2", "q3", "q4"];
 const isQuadrantId = (value: string): value is QuadrantId =>
   quadrantIds.includes(value as QuadrantId);
 
+const parseTasks = (raw: string | null) => {
+  if (!raw) {
+    return [] as Task[];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed as Task[];
+    }
+  } catch {
+    return [] as Task[];
+  }
+  return [] as Task[];
+};
+
 const buildOverlayTask = (task: Task) => (
   <Card className="w-64 border border-glass-border bg-glass-100 text-white backdrop-blur-sm">
     <div className="flex items-start justify-between gap-3">
@@ -111,19 +126,16 @@ export default function MatrixPage() {
   const updateTaskQuadrant = useTaskStore((state) => state.updateTaskQuadrant);
   const clearAllTasks = useTaskStore((state) => state.clearAllTasks);
   const loadTasksByDate = useTaskStore((state) => state.loadTasksByDate);
-  const checkYesterdayIncomplete = useTaskStore(
-    (state) => state.checkYesterdayIncomplete
-  );
   const importTasks = useTaskStore((state) => state.importTasks);
 
   const [title, setTitle] = React.useState("");
   const [context, setContext] = React.useState("");
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
-  const [carryOverTasks, setCarryOverTasks] = React.useState<Task[]>([]);
-  const [showCarryOver, setShowCarryOver] = React.useState(false);
-  const [hasPrompted, setHasPrompted] = React.useState(false);
+  const [showMigrationModal, setShowMigrationModal] = React.useState(false);
+  const [yesterdayTasks, setYesterdayTasks] = React.useState<Task[]>([]);
 
   const prevIncompleteCount = React.useRef(0);
+  const hasCheckedMigration = React.useRef(false);
 
   const resolvedDate = React.useMemo(() => {
     const dateParam = params.date;
@@ -151,28 +163,35 @@ export default function MatrixPage() {
 
   React.useEffect(() => {
     loadTasksByDate(resolvedDate);
-    setHasPrompted(false);
-    setShowCarryOver(false);
-    setCarryOverTasks([]);
+    setShowMigrationModal(false);
+    setYesterdayTasks([]);
+    hasCheckedMigration.current = false;
   }, [loadTasksByDate, resolvedDate]);
 
-  const isToday = resolvedDate === dayjs().format("YYYY-MM-DD");
-
   React.useEffect(() => {
-    if (!isToday || hasPrompted) {
+    if (!currentDate || hasCheckedMigration.current) {
       return;
     }
-    if (tasks.length > 0) {
-      setHasPrompted(true);
+    const currentTasks = parseTasks(
+      localStorage.getItem(`tasks_${currentDate}`)
+    );
+    if (currentTasks.length > 0) {
+      hasCheckedMigration.current = true;
       return;
     }
-    const pending = checkYesterdayIncomplete();
-    if (pending.length > 0) {
-      setCarryOverTasks(pending);
-      setShowCarryOver(true);
+    const yesterday = dayjs(currentDate)
+      .subtract(1, "day")
+      .format("YYYY-MM-DD");
+    const yesterdayAll = parseTasks(
+      localStorage.getItem(`tasks_${yesterday}`)
+    );
+    const incomplete = yesterdayAll.filter((task) => !task.isCompleted);
+    if (incomplete.length > 0) {
+      setYesterdayTasks(incomplete);
+      setShowMigrationModal(true);
     }
-    setHasPrompted(true);
-  }, [checkYesterdayIncomplete, hasPrompted, isToday, tasks.length]);
+    hasCheckedMigration.current = true;
+  }, [currentDate]);
 
   React.useEffect(() => {
     const incompleteCount = tasks.filter((task) => !task.isCompleted).length;
@@ -226,9 +245,17 @@ export default function MatrixPage() {
     clearAllTasks();
   };
 
-  const handleCarryOverConfirm = () => {
-    importTasks(carryOverTasks);
-    setShowCarryOver(false);
+  const handleMigrationConfirm = () => {
+    if (yesterdayTasks.length > 0) {
+      importTasks(yesterdayTasks);
+    }
+    setShowMigrationModal(false);
+    setYesterdayTasks([]);
+  };
+
+  const handleMigrationCancel = () => {
+    setShowMigrationModal(false);
+    setYesterdayTasks([]);
   };
 
   return (
@@ -308,28 +335,28 @@ export default function MatrixPage() {
         </DndContext>
       </div>
 
-      {showCarryOver ? (
+      {showMigrationModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div className="relative w-full max-w-md rounded-2xl border border-glass-border bg-slate-900/90 p-6 text-white backdrop-blur-xl">
             <h2 className="text-lg font-semibold">昨日任务未完成</h2>
             <p className="mt-2 text-sm text-slate-300">
-              昨天还有 {carryOverTasks.length} 个任务未完成，要带到今天吗？
+              检测到昨天有 {yesterdayTasks.length} 个任务没做完，需要帮你带到今天吗？
             </p>
             <div className="mt-6 flex gap-3">
               <Button
                 type="button"
                 variant="primary"
-                onClick={handleCarryOverConfirm}
+                onClick={handleMigrationConfirm}
               >
-                导入任务
+                确认迁移
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowCarryOver(false)}
+                onClick={handleMigrationCancel}
               >
-                以后再说
+                重新开始
               </Button>
             </div>
           </div>
