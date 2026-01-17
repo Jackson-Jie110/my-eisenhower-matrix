@@ -7,7 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
-import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
 
 import useTaskStore from "../../hooks/useTaskStore";
 import { cn } from "../../lib/utils";
@@ -18,6 +18,7 @@ type TaskCardProps = {
   task: Task;
   index: number;
   totalInQuadrant: number;
+  containerId: string;
   onRequestDelete: (task: Task) => void;
   onRequestSnooze: (task: Task) => void;
 };
@@ -26,25 +27,28 @@ export function TaskCard({
   task,
   index,
   totalInQuadrant,
+  containerId,
   onRequestDelete,
   onRequestSnooze,
 }: TaskCardProps) {
   const toggleTaskCompletion = useTaskStore((state) => state.toggleTaskCompletion);
   const reorderTask = useTaskStore((state) => state.reorderTask);
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
       id: task.id,
+      data: { containerId },
     });
 
   const canMoveUp = index > 0;
   const canMoveDown = index < totalInQuadrant - 1;
-  const translate = transform ? CSS.Translate.toString(transform) : "";
+  const translate = transform ? CSS.Transform.toString(transform) : "";
   const style = {
     transform: translate
       ? `${translate}${isDragging ? " scale(1.05)" : ""}`
       : isDragging
         ? "scale(1.05)"
         : undefined,
+    transition,
   };
 
   return (
@@ -109,7 +113,7 @@ export function TaskCard({
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              reorderTask(task.id, "up");
+              reorderTask(task.id, index, index - 1);
             }}
           >
             <ArrowUp className="h-4 w-4" />
@@ -123,7 +127,7 @@ export function TaskCard({
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              reorderTask(task.id, "down");
+              reorderTask(task.id, index, index + 1);
             }}
           >
             <ArrowDown className="h-4 w-4" />

@@ -1,5 +1,6 @@
 import React from "react";
 import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
 import { cn } from "../../lib/utils";
 import type { QuadrantId, Task } from "../../types";
@@ -40,6 +41,8 @@ export function Quadrant({
   });
   const styles = quadrantStyles[quadrantId];
 
+  const taskIds = React.useMemo(() => tasks.map((task) => task.id), [tasks]);
+
   return (
     <section
       ref={setNodeRef}
@@ -52,18 +55,24 @@ export function Quadrant({
       <h3 className={cn("text-sm font-bold tracking-tight", styles.title)}>
         {title}
       </h3>
-      <div className="flex flex-col gap-3">
-        {tasks.map((task, index) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            index={index}
-            totalInQuadrant={tasks.length}
-            onRequestDelete={onRequestDelete}
-            onRequestSnooze={onRequestSnooze}
-          />
-        ))}
-      </div>
+      <SortableContext
+        items={taskIds}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="flex flex-col gap-3">
+          {tasks.map((task, index) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              index={index}
+              totalInQuadrant={tasks.length}
+              containerId={quadrantId}
+              onRequestDelete={onRequestDelete}
+              onRequestSnooze={onRequestSnooze}
+            />
+          ))}
+        </div>
+      </SortableContext>
     </section>
   );
 }

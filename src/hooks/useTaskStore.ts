@@ -17,7 +17,7 @@ type TaskStore = {
   checkYesterdayIncomplete: () => Task[];
   snoozeTask: (task: Task, currentDate: string) => void;
   migrateIncompleteTasks: (fromDate: string, toDate: string) => number;
-  reorderTask: (taskId: string, direction: "up" | "down") => void;
+  reorderTask: (taskId: string, oldIndex: number, newIndex: number) => void;
   softDeleteArchive: (date: string) => void;
   restoreArchive: (date: string) => void;
   permanentlyDeleteArchive: (date: string) => void;
@@ -251,32 +251,41 @@ const useTaskStore = create<TaskStore>((set, get) => ({
 
     return incomplete.length;
   },
-  reorderTask: (taskId, direction) => {
+  reorderTask: (taskId, oldIndex, newIndex) => {
     set((state) => {
-      const targetIndex = state.tasks.findIndex((task) => task.id === taskId);
-      if (targetIndex === -1) {
+      const target = state.tasks.find((task) => task.id === taskId);
+      if (!target) {
         return state;
       }
 
-      const targetQuadrant = state.tasks[targetIndex].quadrantId ?? null;
-      const indices = state.tasks
-        .map((task, index) =>
-          task.quadrantId === targetQuadrant ? index : -1
-        )
-        .filter((index) => index !== -1);
-      const position = indices.indexOf(targetIndex);
-      const nextPosition = direction === "up" ? position - 1 : position + 1;
+      const targetQuadrant = target.quadrantId ?? null;
+      const quadrantTasks = state.tasks.filter(
+        (task) => task.quadrantId === targetQuadrant
+      );
 
-      if (nextPosition < 0 || nextPosition >= indices.length) {
+      if (
+        oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= quadrantTasks.length ||
+        newIndex >= quadrantTasks.length ||
+        oldIndex === newIndex
+      ) {
         return state;
       }
 
-      const swapIndex = indices[nextPosition];
-      const updated = [...state.tasks];
-      [updated[targetIndex], updated[swapIndex]] = [
-        updated[swapIndex],
-        updated[targetIndex],
-      ];
+      const reordered = [...quadrantTasks];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+
+      let cursor = 0;
+      const updated = state.tasks.map((task) => {
+        if (task.quadrantId === targetQuadrant) {
+          const nextTask = reordered[cursor];
+          cursor += 1;
+          return nextTask;
+        }
+        return task;
+      });
 
       if (typeof window !== "undefined") {
         saveTasks(state.currentDate, updated);

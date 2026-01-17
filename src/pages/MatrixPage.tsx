@@ -10,9 +10,11 @@ import {
   useSensor,
   useSensors,
   useDroppable,
+  closestCenter,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import confetti from "canvas-confetti";
 
 import useTaskStore from "../hooks/useTaskStore";
@@ -104,22 +106,28 @@ function BacklogPanel({
         <h2 className="text-sm font-semibold text-slate-100">待办任务池</h2>
         <span className="text-xs text-slate-400">{tasks.length} 项</span>
       </div>
-      <div className="flex flex-col gap-3">
-        {tasks.length === 0 ? (
-          <p className="text-xs text-slate-400">暂无待办任务</p>
-        ) : (
-          tasks.map((task, index) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              index={index}
-              totalInQuadrant={tasks.length}
-              onRequestDelete={onRequestDelete}
-              onRequestSnooze={onRequestSnooze}
-            />
-          ))
-        )}
-      </div>
+      <SortableContext
+        items={tasks.map((task) => task.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div className="flex flex-col gap-3">
+          {tasks.length === 0 ? (
+            <p className="text-xs text-slate-400">暂无待办任务</p>
+          ) : (
+            tasks.map((task, index) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                index={index}
+                totalInQuadrant={tasks.length}
+                containerId={BACKLOG_ID}
+                onRequestDelete={onRequestDelete}
+                onRequestSnooze={onRequestSnooze}
+              />
+            ))
+          )}
+        </div>
+      </SortableContext>
     </section>
   );
 }
@@ -145,6 +153,7 @@ export default function MatrixPage() {
   const updateTaskQuadrant = useTaskStore((state) => state.updateTaskQuadrant);
   const deleteTask = useTaskStore((state) => state.deleteTask);
   const snoozeTask = useTaskStore((state) => state.snoozeTask);
+  const reorderTask = useTaskStore((state) => state.reorderTask);
   const clearAllTasks = useTaskStore((state) => state.clearAllTasks);
   const loadTasksByDate = useTaskStore((state) => state.loadTasksByDate);
   const importTasks = useTaskStore((state) => state.importTasks);
@@ -289,13 +298,37 @@ export default function MatrixPage() {
     const overId = String(over.id);
     const activeId = String(active.id);
 
-    if (overId === BACKLOG_ID) {
+    const activeContainer =
+      (active.data.current?.containerId as string | undefined) ??
+      (isQuadrantId(activeId) ? activeId : BACKLOG_ID);
+    const overContainer =
+      (over.data.current?.containerId as string | undefined) ??
+      (overId === BACKLOG_ID || isQuadrantId(overId) ? overId : undefined);
+
+    if (!overContainer) {
+      return;
+    }
+
+    if (activeContainer === overContainer) {
+      const containerTasks =
+        activeContainer === BACKLOG_ID
+          ? backlogTasks
+          : tasks.filter((task) => task.quadrantId === activeContainer);
+      const oldIndex = containerTasks.findIndex((task) => task.id === activeId);
+      const newIndex = containerTasks.findIndex((task) => task.id === overId);
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        reorderTask(activeId, oldIndex, newIndex);
+      }
+      return;
+    }
+
+    if (overContainer === BACKLOG_ID) {
       updateTaskQuadrant(activeId, null);
       return;
     }
 
-    if (isQuadrantId(overId)) {
-      updateTaskQuadrant(activeId, overId);
+    if (isQuadrantId(overContainer)) {
+      updateTaskQuadrant(activeId, overContainer);
     }
   };
 
@@ -436,6 +469,7 @@ export default function MatrixPage() {
 
         <DndContext
           sensors={sensors}
+          collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragCancel={() => setActiveTaskId(null)}
