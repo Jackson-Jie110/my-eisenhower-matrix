@@ -1,8 +1,15 @@
 import React from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
-import { motion } from "framer-motion";
-import { ArrowRight, CalendarPlus, Download, Upload } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowRight,
+  CalendarPlus,
+  ChevronDown,
+  Download,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 
@@ -92,9 +99,11 @@ const seedMockData = () => {
 const ArchiveCard = ({
   entry,
   highlight,
+  onDelete,
 }: {
   entry: DateEntry;
   highlight?: boolean;
+  onDelete: (date: string) => void;
 }) => {
   const day = dayjs(entry.date).format("D日");
   const weekday = formatWeekday(entry.date);
@@ -111,6 +120,18 @@ const ArchiveCard = ({
       } 
       ${highlight ? "ring-2 ring-blue-500/50" : ""}`}
     >
+      <button
+        type="button"
+        aria-label="删除档案"
+        className="absolute right-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-full text-red-400 opacity-0 transition-opacity hover:bg-red-500/20 group-hover:opacity-100"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onDelete(entry.date);
+        }}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
       <div className="flex items-start justify-between z-10 relative">
         <div className="flex flex-col">
           <span className="text-sm font-medium text-slate-400 group-hover:text-slate-200 transition-colors">
@@ -150,6 +171,9 @@ export default function ArchivePage() {
   const [entries, setEntries] = React.useState<DateEntry[]>([]);
   const [supportsPicker, setSupportsPicker] = React.useState(false);
   const [pendingDate, setPendingDate] = React.useState("");
+  const [expandedMonths, setExpandedMonths] = React.useState<
+    Record<string, boolean>
+  >({});
   const today = dayjs().format("YYYY-MM-DD");
   const navigate = useNavigate();
   const dateInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -219,6 +243,27 @@ export default function ArchivePage() {
     [groupedTasks]
   );
 
+  React.useEffect(() => {
+    setExpandedMonths((prev) => {
+      if (sortedGroups.length === 0) {
+        return {};
+      }
+      if (Object.keys(prev).length === 0) {
+        const initial: Record<string, boolean> = {};
+        sortedGroups.forEach(([month], index) => {
+          initial[month] = index === 0;
+        });
+        return initial;
+      }
+
+      const next: Record<string, boolean> = {};
+      sortedGroups.forEach(([month]) => {
+        next[month] = prev[month] ?? false;
+      });
+      return next;
+    });
+  }, [sortedGroups]);
+
   const handleOpenPicker = () => {
     const input = dateInputRef.current;
     if (!input) {
@@ -243,6 +288,22 @@ export default function ArchivePage() {
       return;
     }
     navigate(`/matrix/${pendingDate}`);
+  };
+
+  const handleDeleteEntry = (date: string) => {
+    const confirmed = window.confirm("确定要删除这一天的档案吗？");
+    if (!confirmed) {
+      return;
+    }
+    localStorage.removeItem(`tasks_${date}`);
+    setEntries((prev) => prev.filter((entry) => entry.date !== date));
+  };
+
+  const toggleMonth = (month: string) => {
+    setExpandedMonths((prev) => ({
+      ...prev,
+      [month]: !prev[month],
+    }));
   };
 
   const handleExport = () => {
@@ -381,23 +442,56 @@ export default function ArchivePage() {
           <h2 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-white/10 pb-2">
             今日 (Today)
           </h2>
-          <ArchiveCard entry={todayEntry} highlight />
+          <ArchiveCard
+            entry={todayEntry}
+            highlight
+            onDelete={handleDeleteEntry}
+          />
         </section>
 
         <section className="space-y-6">
           <h2 className="text-sm font-semibold text-slate-200">全部档案</h2>
-          {sortedGroups.map(([month, dates]) => (
-            <div key={month}>
-              <h3 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-white/10 pb-2">
-                {month}
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {dates.map((entry) => (
-                  <ArchiveCard key={entry.date} entry={entry} />
-                ))}
+          {sortedGroups.map(([month, dates]) => {
+            const isExpanded = expandedMonths[month];
+            return (
+              <div key={month}>
+                <button
+                  type="button"
+                  onClick={() => toggleMonth(month)}
+                  className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-left text-2xl font-bold text-white transition-colors hover:bg-white/10"
+                >
+                  <span>{month}</span>
+                  <ChevronDown
+                    className={`h-5 w-5 transition-transform ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                <AnimatePresence initial={false}>
+                  {isExpanded ? (
+                    <motion.div
+                      key={`${month}-grid`}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {dates.map((entry) => (
+                          <ArchiveCard
+                            key={entry.date}
+                            entry={entry}
+                            onDelete={handleDeleteEntry}
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       </div>
     </motion.div>
