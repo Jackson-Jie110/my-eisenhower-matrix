@@ -103,11 +103,11 @@ const ArchiveCard = ({
   return (
     <Link
       to={`/matrix/${entry.date}`}
-      className={`group relative flex flex-col justify-between rounded-2xl border p-4 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:brightness-110 
+      className={`group relative flex flex-col justify-between rounded-2xl border p-4 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 
       ${
         completed
-          ? "bg-slate-900/80 border-[#EAB308] shadow-[0_0_20px_2px_rgba(234,179,8,0.4)]"
-          : "bg-slate-900/40 border-white/10 hover:border-white/20"
+          ? "bg-slate-900/80 border-[#EAB308] shadow-[0_0_20px_2px_rgba(234,179,8,0.4)] hover:shadow-[0_0_25px_4px_rgba(234,179,8,0.5)]"
+          : "bg-slate-900/50 border-white/20 shadow-[0_2px_12px_rgba(255,255,255,0.08)] hover:bg-slate-900/70 hover:border-white/30 hover:shadow-[0_4px_16px_rgba(255,255,255,0.12)]"
       } 
       ${highlight ? "ring-2 ring-blue-500/50" : ""}`}
     >
@@ -211,9 +211,10 @@ export default function ArchivePage() {
 
   const sortedGroups = React.useMemo(
     () =>
-      Object.entries(groupedTasks).sort((a, b) =>
-        dayjs(b[0], "YYYY年M月").valueOf() -
-        dayjs(a[0], "YYYY年M月").valueOf()
+      Object.entries(groupedTasks).sort(
+        (a, b) =>
+          dayjs(b[0], "YYYY年M月").valueOf() -
+          dayjs(a[0], "YYYY年M月").valueOf()
       ),
     [groupedTasks]
   );

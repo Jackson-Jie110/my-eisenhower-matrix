@@ -16,6 +16,7 @@ type TaskStore = {
   loadTasksByDate: (date: string) => void;
   checkYesterdayIncomplete: () => Task[];
   snoozeTask: (task: Task, currentDate: string) => void;
+  migrateIncompleteTasks: (fromDate: string, toDate: string) => number;
 };
 
 const STORAGE_PREFIX = "tasks_";
@@ -209,6 +210,39 @@ const useTaskStore = create<TaskStore>((set, get) => ({
 
       return { tasks: updatedToday };
     });
+  },
+  migrateIncompleteTasks: (fromDate, toDate) => {
+    if (typeof window === "undefined") {
+      return 0;
+    }
+    const sourceDate = resolveDate(fromDate);
+    const targetDate = resolveDate(toDate);
+
+    const sourceTasks = parseTasks(
+      localStorage.getItem(getStorageKey(sourceDate))
+    );
+    const incomplete = sourceTasks.filter((task) => !task.isCompleted);
+    if (incomplete.length === 0) {
+      return 0;
+    }
+
+    const remaining = sourceTasks.filter((task) => task.isCompleted);
+    const targetTasks = parseTasks(
+      localStorage.getItem(getStorageKey(targetDate))
+    );
+    const updatedTarget = [...targetTasks, ...incomplete];
+
+    saveTasks(sourceDate, remaining);
+    saveTasks(targetDate, updatedTarget);
+
+    const { currentDate } = get();
+    if (currentDate === sourceDate) {
+      set({ tasks: remaining });
+    } else if (currentDate === targetDate) {
+      set({ tasks: updatedTarget });
+    }
+
+    return incomplete.length;
   },
 }));
 

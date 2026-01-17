@@ -1,7 +1,7 @@
 import React from "react";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronLeft, ListEnd, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   DndContext,
@@ -127,6 +127,9 @@ export default function MatrixPage() {
   const clearAllTasks = useTaskStore((state) => state.clearAllTasks);
   const loadTasksByDate = useTaskStore((state) => state.loadTasksByDate);
   const importTasks = useTaskStore((state) => state.importTasks);
+  const migrateIncompleteTasks = useTaskStore(
+    (state) => state.migrateIncompleteTasks
+  );
 
   const [title, setTitle] = React.useState("");
   const [context, setContext] = React.useState("");
@@ -258,6 +261,25 @@ export default function MatrixPage() {
     setYesterdayTasks([]);
   };
 
+  const handleMigrateAllToTomorrow = () => {
+    const confirmed = window.confirm(
+      "确定将今日所有未完成任务推迟到明天吗？"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const tomorrow = dayjs(currentDate).add(1, "day").format("YYYY-MM-DD");
+    const movedCount = migrateIncompleteTasks(currentDate, tomorrow);
+
+    if (movedCount > 0) {
+      window.alert(`成功将 ${movedCount} 个任务移动到明天`);
+      loadTasksByDate(currentDate);
+    } else {
+      window.alert("今日暂无待办任务");
+    }
+  };
+
   return (
     <motion.div
       variants={pageMotion}
@@ -286,6 +308,15 @@ export default function MatrixPage() {
             <p className="text-sm text-slate-400">{currentDate}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleMigrateAllToTomorrow}
+              className="flex items-center gap-2 border border-glass-border text-slate-200 hover:bg-white/10"
+            >
+              <ListEnd className="h-4 w-4" />
+              <span className="hidden sm:inline">一键迁移</span>
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -343,6 +374,21 @@ export default function MatrixPage() {
             <p className="mt-2 text-sm text-slate-300">
               检测到昨天有 {yesterdayTasks.length} 个任务没做完，需要帮你带到今天吗？
             </p>
+            <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto pr-1">
+              {yesterdayTasks.map((task) => (
+                <li
+                  key={task.id}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                >
+                  <p className="text-sm text-slate-100">{task.title}</p>
+                  {task.context ? (
+                    <p className="mt-1 text-xs text-slate-400">
+                      {task.context}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
             <div className="mt-6 flex gap-3">
               <Button
                 type="button"
