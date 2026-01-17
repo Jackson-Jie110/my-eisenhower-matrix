@@ -16,11 +16,13 @@ import {
 import confetti from "canvas-confetti";
 
 import useTaskStore from "../hooks/useTaskStore";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import type { QuadrantId, Task } from "../types";
 import { MatrixGrid } from "../components/Matrix/MatrixGrid";
 import { TaskCard } from "../components/Task/TaskCard";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { Input } from "../components/ui/Input";
 import { ParticlesBackground } from "../components/ui/ParticlesBackground";
 import { cn } from "../lib/utils";
@@ -79,7 +81,15 @@ const buildOverlayTask = (task: Task) => (
   </Card>
 );
 
-function BacklogPanel({ tasks }: { tasks: Task[] }) {
+function BacklogPanel({
+  tasks,
+  onRequestDelete,
+  onRequestSnooze,
+}: {
+  tasks: Task[];
+  onRequestDelete: (task: Task) => void;
+  onRequestSnooze: (task: Task) => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: BACKLOG_ID });
 
   return (
@@ -98,7 +108,16 @@ function BacklogPanel({ tasks }: { tasks: Task[] }) {
         {tasks.length === 0 ? (
           <p className="text-xs text-slate-400">暂无待办任务</p>
         ) : (
-          tasks.map((task) => <TaskCard key={task.id} task={task} />)
+          tasks.map((task, index) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              index={index}
+              totalInQuadrant={tasks.length}
+              onRequestDelete={onRequestDelete}
+              onRequestSnooze={onRequestSnooze}
+            />
+          ))
         )}
       </div>
     </section>
@@ -124,6 +143,8 @@ export default function MatrixPage() {
   const currentDate = useTaskStore((state) => state.currentDate);
   const addTask = useTaskStore((state) => state.addTask);
   const updateTaskQuadrant = useTaskStore((state) => state.updateTaskQuadrant);
+  const deleteTask = useTaskStore((state) => state.deleteTask);
+  const snoozeTask = useTaskStore((state) => state.snoozeTask);
   const clearAllTasks = useTaskStore((state) => state.clearAllTasks);
   const loadTasksByDate = useTaskStore((state) => state.loadTasksByDate);
   const importTasks = useTaskStore((state) => state.importTasks);
@@ -136,9 +157,14 @@ export default function MatrixPage() {
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
   const [showMigrationModal, setShowMigrationModal] = React.useState(false);
   const [yesterdayTasks, setYesterdayTasks] = React.useState<Task[]>([]);
+  const [pendingTaskAction, setPendingTaskAction] = React.useState<{
+    type: "delete" | "migrate";
+    task: Task;
+  } | null>(null);
 
   const prevIncompleteCount = React.useRef(0);
   const hasCheckedMigration = React.useRef(false);
+  const titleInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const resolvedDate = React.useMemo(() => {
     const dateParam = params.date;
@@ -153,6 +179,41 @@ export default function MatrixPage() {
       activationConstraint: { distance: 8 },
     })
   );
+
+  const isConfirmSuppressed = React.useCallback((featureKey: string) => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const raw = localStorage.getItem(`suppress_confirm_${featureKey}`);
+    if (!raw) {
+      return false;
+    }
+    try {
+      const parsed = JSON.parse(raw) as { date?: string; suppressed?: boolean };
+      return (
+        parsed?.suppressed === true &&
+        parsed?.date === dayjs().format("YYYY-MM-DD")
+      );
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const handleEscape = React.useCallback(() => {
+    if (pendingTaskAction) {
+      setPendingTaskAction(null);
+      return;
+    }
+    if (showMigrationModal) {
+      setShowMigrationModal(false);
+      setYesterdayTasks([]);
+    }
+  }, [pendingTaskAction, showMigrationModal]);
+
+  useKeyboardShortcuts({
+    inputRef: titleInputRef,
+    onEscape: handleEscape,
+  });
 
   const backlogTasks = React.useMemo(
     () => tasks.filter((task) => task.quadrantId == null),
@@ -261,6 +322,50 @@ export default function MatrixPage() {
     setYesterdayTasks([]);
   };
 
+  const handleTaskConfirm = () => {
+    if (!pendingTaskAction) {
+      return;
+    }
+    if (pendingTaskAction.type === "delete") {
+      deleteTask(pendingTaskAction.task.id);
+    } else {
+      snoozeTask(pendingTaskAction.task, currentDate);
+    }
+    setPendingTaskAction(null);
+  };
+
+  const handleTaskCancel = () => {
+    setPendingTaskAction(null);
+  };
+
+  const requestTaskDelete = (task: Task) => {
+    if (isConfirmSuppressed("delete_task")) {
+      deleteTask(task.id);
+      return;
+    }
+    setPendingTaskAction({ type: "delete", task });
+  };
+
+  const requestTaskSnooze = (task: Task) => {
+    if (isConfirmSuppressed("migrate_task")) {
+      snoozeTask(task, currentDate);
+      return;
+    }
+    setPendingTaskAction({ type: "migrate", task });
+  };
+
+  const confirmTitle =
+    pendingTaskAction?.type === "delete" ? "删除任务" : "推迟任务";
+  const confirmMessage = pendingTaskAction
+    ? pendingTaskAction.type === "delete"
+      ? `确定删除“${pendingTaskAction.task.title}”吗？此操作不可恢复。`
+      : `确定将“${pendingTaskAction.task.title}”推迟到明天吗？`
+    : "";
+  const confirmText =
+    pendingTaskAction?.type === "delete" ? "删除" : "迁移";
+  const confirmFeatureKey =
+    pendingTaskAction?.type === "delete" ? "delete_task" : "migrate_task";
+
   const handleMigrateAllToTomorrow = () => {
     const confirmed = window.confirm(
       "确定将今日所有未完成任务推迟到明天吗？"
@@ -343,6 +448,7 @@ export default function MatrixPage() {
               placeholder="输入任务标题..."
               value={title}
               onChange={(event) => setTitle(event.target.value)}
+              ref={titleInputRef}
             />
             <Input
               placeholder="补充备注（可选）..."
@@ -356,15 +462,33 @@ export default function MatrixPage() {
             </div>
           </form>
 
-          <BacklogPanel tasks={backlogTasks} />
+          <BacklogPanel
+            tasks={backlogTasks}
+            onRequestDelete={requestTaskDelete}
+            onRequestSnooze={requestTaskSnooze}
+          />
 
-          <MatrixGrid />
+          <MatrixGrid
+            onRequestDelete={requestTaskDelete}
+            onRequestSnooze={requestTaskSnooze}
+          />
 
           <DragOverlay>
             {activeTask ? buildOverlayTask(activeTask) : null}
           </DragOverlay>
         </DndContext>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(pendingTaskAction)}
+        onConfirm={handleTaskConfirm}
+        onCancel={handleTaskCancel}
+        title={confirmTitle}
+        message={confirmMessage}
+        confirmText={confirmText}
+        isDanger={pendingTaskAction?.type === "delete"}
+        featureKey={confirmFeatureKey}
+      />
 
       {showMigrationModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">

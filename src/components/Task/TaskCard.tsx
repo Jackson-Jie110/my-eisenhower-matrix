@@ -1,5 +1,11 @@
 import React from "react";
-import { Check, Trash2, ArrowRightCircle } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRightCircle,
+  ArrowUp,
+  Check,
+  Trash2,
+} from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
 
@@ -10,18 +16,28 @@ import { Card } from "../ui/Card";
 
 type TaskCardProps = {
   task: Task;
+  index: number;
+  totalInQuadrant: number;
+  onRequestDelete: (task: Task) => void;
+  onRequestSnooze: (task: Task) => void;
 };
 
-export function TaskCard({ task }: TaskCardProps) {
-  const deleteTask = useTaskStore((state) => state.deleteTask);
+export function TaskCard({
+  task,
+  index,
+  totalInQuadrant,
+  onRequestDelete,
+  onRequestSnooze,
+}: TaskCardProps) {
   const toggleTaskCompletion = useTaskStore((state) => state.toggleTaskCompletion);
-  const snoozeTask = useTaskStore((state) => state.snoozeTask);
-  const currentDate = useTaskStore((state) => state.currentDate);
+  const reorderTask = useTaskStore((state) => state.reorderTask);
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: task.id,
     });
 
+  const canMoveUp = index > 0;
+  const canMoveDown = index < totalInQuadrant - 1;
   const translate = transform ? CSS.Translate.toString(transform) : "";
   const style = {
     transform: translate
@@ -85,6 +101,34 @@ export function TaskCard({ task }: TaskCardProps) {
         ) : null}
       </div>
       <div className="flex items-center gap-2">
+        {canMoveUp ? (
+          <button
+            type="button"
+            aria-label="上移任务"
+            className="opacity-0 transition-opacity duration-200 group-hover:opacity-100 text-slate-300 hover:text-white"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              reorderTask(task.id, "up");
+            }}
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>
+        ) : null}
+        {canMoveDown ? (
+          <button
+            type="button"
+            aria-label="下移任务"
+            className="opacity-0 transition-opacity duration-200 group-hover:opacity-100 text-slate-300 hover:text-white"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              reorderTask(task.id, "down");
+            }}
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+        ) : null}
         {!task.isCompleted ? (
           <button
             type="button"
@@ -93,7 +137,7 @@ export function TaskCard({ task }: TaskCardProps) {
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
-              snoozeTask(task, currentDate);
+              onRequestSnooze(task);
             }}
           >
             <ArrowRightCircle className="h-4 w-4" />
@@ -106,7 +150,7 @@ export function TaskCard({ task }: TaskCardProps) {
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
-            deleteTask(task.id);
+            onRequestDelete(task);
           }}
         >
           <Trash2 className="h-4 w-4" />

@@ -15,7 +15,15 @@ const quadrantOrder: QuadrantId[] = ["q1", "q2", "q3", "q4"];
 const filterTasksByQuadrant = (tasks: Task[], quadrantId: QuadrantId) =>
   tasks.filter((task) => task.quadrantId === quadrantId);
 
-export function MatrixGrid() {
+type MatrixGridProps = {
+  onRequestDelete: (task: Task) => void;
+  onRequestSnooze: (task: Task) => void;
+};
+
+export function MatrixGrid({
+  onRequestDelete,
+  onRequestSnooze,
+}: MatrixGridProps) {
   const tasks = useTaskStore((state) => state.tasks);
 
   return (
@@ -26,6 +34,8 @@ export function MatrixGrid() {
           quadrantId={quadrantId}
           title={quadrantTitles[quadrantId]}
           tasks={filterTasksByQuadrant(tasks, quadrantId)}
+          onRequestDelete={onRequestDelete}
+          onRequestSnooze={onRequestSnooze}
         />
       ))}
     </section>

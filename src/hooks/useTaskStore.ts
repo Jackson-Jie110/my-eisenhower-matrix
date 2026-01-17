@@ -17,13 +17,20 @@ type TaskStore = {
   checkYesterdayIncomplete: () => Task[];
   snoozeTask: (task: Task, currentDate: string) => void;
   migrateIncompleteTasks: (fromDate: string, toDate: string) => number;
+  reorderTask: (taskId: string, direction: "up" | "down") => void;
+  softDeleteArchive: (date: string) => void;
+  restoreArchive: (date: string) => void;
+  permanentlyDeleteArchive: (date: string) => void;
+  emptyRecycleBin: () => void;
 };
 
 const STORAGE_PREFIX = "tasks_";
+const RECYCLE_PREFIX = "recycle_";
 const LEGACY_KEY = "tasks";
 const PERSIST_KEY = "flat-matrix-storage";
 
 const getStorageKey = (date: string) => `${STORAGE_PREFIX}${date}`;
+const getRecycleKey = (date: string) => `${RECYCLE_PREFIX}${date}`;
 
 const parseTasks = (raw: string | null): Task[] => {
   if (!raw) {
@@ -243,6 +250,86 @@ const useTaskStore = create<TaskStore>((set, get) => ({
     }
 
     return incomplete.length;
+  },
+  reorderTask: (taskId, direction) => {
+    set((state) => {
+      const targetIndex = state.tasks.findIndex((task) => task.id === taskId);
+      if (targetIndex === -1) {
+        return state;
+      }
+
+      const targetQuadrant = state.tasks[targetIndex].quadrantId ?? null;
+      const indices = state.tasks
+        .map((task, index) =>
+          task.quadrantId === targetQuadrant ? index : -1
+        )
+        .filter((index) => index !== -1);
+      const position = indices.indexOf(targetIndex);
+      const nextPosition = direction === "up" ? position - 1 : position + 1;
+
+      if (nextPosition < 0 || nextPosition >= indices.length) {
+        return state;
+      }
+
+      const swapIndex = indices[nextPosition];
+      const updated = [...state.tasks];
+      [updated[targetIndex], updated[swapIndex]] = [
+        updated[swapIndex],
+        updated[targetIndex],
+      ];
+
+      if (typeof window !== "undefined") {
+        saveTasks(state.currentDate, updated);
+      }
+
+      return { tasks: updated };
+    });
+  },
+  softDeleteArchive: (date) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const targetDate = resolveDate(date);
+    const sourceKey = getStorageKey(targetDate);
+    const recycleKey = getRecycleKey(targetDate);
+    const payload = localStorage.getItem(sourceKey);
+    if (!payload) {
+      return;
+    }
+    localStorage.setItem(recycleKey, payload);
+    localStorage.removeItem(sourceKey);
+
+    if (get().currentDate === targetDate) {
+      set({ tasks: [] });
+    }
+  },
+  restoreArchive: (date) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const targetDate = resolveDate(date);
+    const recycleKey = getRecycleKey(targetDate);
+    const payload = localStorage.getItem(recycleKey);
+    if (!payload) {
+      return;
+    }
+    localStorage.setItem(getStorageKey(targetDate), payload);
+    localStorage.removeItem(recycleKey);
+  },
+  permanentlyDeleteArchive: (date) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const targetDate = resolveDate(date);
+    localStorage.removeItem(getRecycleKey(targetDate));
+  },
+  emptyRecycleBin: () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(RECYCLE_PREFIX))
+      .forEach((key) => localStorage.removeItem(key));
   },
 }));
 

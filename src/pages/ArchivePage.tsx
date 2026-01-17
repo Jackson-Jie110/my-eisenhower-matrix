@@ -7,14 +7,17 @@ import {
   CalendarPlus,
   ChevronDown,
   Download,
+  LayoutDashboard,
   Trash2,
   Upload,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 
+import useTaskStore from "../hooks/useTaskStore";
 import type { Task } from "../types";
 import { Button } from "../components/ui/Button";
+import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { ParticlesBackground } from "../components/ui/ParticlesBackground";
 
 const pageMotion = {
@@ -171,11 +174,15 @@ export default function ArchivePage() {
   const [entries, setEntries] = React.useState<DateEntry[]>([]);
   const [supportsPicker, setSupportsPicker] = React.useState(false);
   const [pendingDate, setPendingDate] = React.useState("");
+  const [pendingDeleteDate, setPendingDeleteDate] = React.useState<
+    string | null
+  >(null);
   const [expandedMonths, setExpandedMonths] = React.useState<
     Record<string, boolean>
   >({});
   const today = dayjs().format("YYYY-MM-DD");
   const navigate = useNavigate();
+  const softDeleteArchive = useTaskStore((state) => state.softDeleteArchive);
   const dateInputRef = React.useRef<HTMLInputElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -290,14 +297,50 @@ export default function ArchivePage() {
     navigate(`/matrix/${pendingDate}`);
   };
 
+  const isConfirmSuppressed = React.useCallback((featureKey: string) => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const raw = localStorage.getItem(`suppress_confirm_${featureKey}`);
+    if (!raw) {
+      return false;
+    }
+    try {
+      const parsed = JSON.parse(raw) as { date?: string; suppressed?: boolean };
+      return (
+        parsed?.suppressed === true &&
+        parsed?.date === dayjs().format("YYYY-MM-DD")
+      );
+    } catch {
+      return false;
+    }
+  }, []);
+
   const handleDeleteEntry = (date: string) => {
-    const confirmed = window.confirm("确定要删除这一天的档案吗？");
-    if (!confirmed) {
+    if (isConfirmSuppressed("delete_archive")) {
+      softDeleteArchive(date);
+      setEntries((prev) => prev.filter((entry) => entry.date !== date));
       return;
     }
-    localStorage.removeItem(`tasks_${date}`);
-    setEntries((prev) => prev.filter((entry) => entry.date !== date));
+    setPendingDeleteDate(date);
   };
+
+  const handleConfirmDelete = () => {
+    if (!pendingDeleteDate) {
+      return;
+    }
+    softDeleteArchive(pendingDeleteDate);
+    setEntries((prev) => prev.filter((entry) => entry.date !== pendingDeleteDate));
+    setPendingDeleteDate(null);
+  };
+
+  const handleCancelDelete = () => {
+    setPendingDeleteDate(null);
+  };
+
+  const deleteConfirmMessage = pendingDeleteDate
+    ? `确定将 ${pendingDeleteDate} 的档案移入回收站吗？`
+    : "";
 
   const toggleMonth = (month: string) => {
     setExpandedMonths((prev) => ({
@@ -375,6 +418,24 @@ export default function ArchivePage() {
             <h1 className="text-3xl font-semibold text-white">档案室</h1>
           </div>
           <div className="relative flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center gap-2"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              仪表盘
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => navigate("/recycle-bin")}
+              className="flex items-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              回收站
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -494,6 +555,16 @@ export default function ArchivePage() {
           })}
         </section>
       </div>
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteDate)}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        title="删除档案"
+        message={deleteConfirmMessage}
+        confirmText="移入回收站"
+        isDanger
+        featureKey="delete_archive"
+      />
     </motion.div>
   );
 }

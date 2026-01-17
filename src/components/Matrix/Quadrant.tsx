@@ -9,6 +9,8 @@ type QuadrantProps = {
   title: string;
   quadrantId: QuadrantId;
   tasks: Task[];
+  onRequestDelete: (task: Task) => void;
+  onRequestSnooze: (task: Task) => void;
 };
 
 const quadrantStyles: Record<QuadrantId, { title: string }> = {
@@ -26,7 +28,13 @@ const quadrantStyles: Record<QuadrantId, { title: string }> = {
   },
 };
 
-export function Quadrant({ title, quadrantId, tasks }: QuadrantProps) {
+export function Quadrant({
+  title,
+  quadrantId,
+  tasks,
+  onRequestDelete,
+  onRequestSnooze,
+}: QuadrantProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: quadrantId,
   });
@@ -45,8 +53,15 @@ export function Quadrant({ title, quadrantId, tasks }: QuadrantProps) {
         {title}
       </h3>
       <div className="flex flex-col gap-3">
-        {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+        {tasks.map((task, index) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            index={index}
+            totalInQuadrant={tasks.length}
+            onRequestDelete={onRequestDelete}
+            onRequestSnooze={onRequestSnooze}
+          />
         ))}
       </div>
     </section>
