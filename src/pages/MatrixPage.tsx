@@ -242,24 +242,24 @@ export default function MatrixPage() {
   }, [loadTasksByDate, resolvedDate]);
 
   React.useEffect(() => {
-    if (!currentDate) {
+    if (!resolvedDate) {
       return;
     }
-    if (migrationCheckedDate.current === currentDate) {
+    if (migrationCheckedDate.current === resolvedDate) {
       return;
     }
-    migrationCheckedDate.current = currentDate;
+    migrationCheckedDate.current = resolvedDate;
 
     if (typeof window === "undefined") {
       return;
     }
 
-    const currentKey = `tasks_${currentDate}`;
+    const currentKey = `tasks_${resolvedDate}`;
     const currentRaw = localStorage.getItem(currentKey);
     const currentTasks = parseTasks(currentRaw);
 
     if (currentTasks.length > 0) {
-      const startOfDay = dayjs(currentDate).startOf("day").valueOf();
+      const startOfDay = dayjs(resolvedDate).startOf("day").valueOf();
       const allBeforeToday = currentTasks.every(
         (task) =>
           typeof task.createdAt === "number" && task.createdAt < startOfDay
@@ -269,32 +269,40 @@ export default function MatrixPage() {
           .filter((key) => key.startsWith("tasks_") && key !== currentKey)
           .some((key) => localStorage.getItem(key) === currentRaw);
         if (hasDuplicate) {
-          clearAllTasks();
+          localStorage.setItem(currentKey, JSON.stringify([]));
+          if (currentDate === resolvedDate) {
+            clearAllTasks();
+          }
           return;
         }
       }
     }
 
-    const strictYesterday = dayjs(currentDate)
+    if (currentTasks.length > 0) {
+      return;
+    }
+
+    const yesterdayKey = `tasks_${dayjs(resolvedDate)
       .subtract(1, "day")
-      .format("YYYY-MM-DD");
-    const strictYesterdayRaw = localStorage.getItem(`tasks_${strictYesterday}`);
-    if (!strictYesterdayRaw) {
+      .format("YYYY-MM-DD")}`;
+    const yesterdayRaw = localStorage.getItem(yesterdayKey);
+    if (!yesterdayRaw) {
       return;
     }
-    const strictYesterdayTasks = parseTasks(strictYesterdayRaw);
-    if (strictYesterdayTasks.length === 0) {
-      return;
+    try {
+      const parsed = JSON.parse(yesterdayRaw) as unknown;
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+      const incomplete = (parsed as Task[]).filter((task) => !task.isCompleted);
+      if (incomplete.length > 0) {
+        setYesterdayTasks(incomplete);
+        setShowMigrationModal(true);
+      }
+    } catch (error) {
+      console.error("Migration check failed", error);
     }
-    const incomplete = strictYesterdayTasks.filter((task) => !task.isCompleted);
-    if (incomplete.length === 0) {
-      return;
-    }
-    if (currentTasks.length === 0) {
-      setYesterdayTasks(incomplete);
-      setShowMigrationModal(true);
-    }
-  }, [clearAllTasks, currentDate]);
+  }, [clearAllTasks, currentDate, resolvedDate]);
 
   React.useEffect(() => {
     const incompleteCount = tasks.filter((task) => !task.isCompleted).length;
