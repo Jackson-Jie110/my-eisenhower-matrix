@@ -10,7 +10,7 @@ import {
   useSensor,
   useSensors,
   useDroppable,
-  closestCenter,
+  closestCorners,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -98,7 +98,7 @@ function BacklogPanel({
     <section
       ref={setNodeRef}
       className={cn(
-        "rounded-xl border border-glass-border bg-glass-100 p-4 backdrop-blur-md transition-all",
+        "min-h-[120px] rounded-xl border border-glass-border bg-glass-100 p-4 backdrop-blur-md transition-all",
         isOver && "border-white/40 bg-glass-200"
       )}
     >
@@ -164,6 +164,7 @@ export default function MatrixPage() {
   const [title, setTitle] = React.useState("");
   const [context, setContext] = React.useState("");
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
+  const [activeWidth, setActiveWidth] = React.useState<number | null>(null);
   const [showMigrationModal, setShowMigrationModal] = React.useState(false);
   const [yesterdayTasks, setYesterdayTasks] = React.useState<Task[]>([]);
   const [pendingTaskAction, setPendingTaskAction] = React.useState<{
@@ -317,10 +318,20 @@ export default function MatrixPage() {
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveTaskId(String(active.id));
+    const rect = active.rect.current;
+    if (rect?.width) {
+      setActiveWidth(rect.width);
+      return;
+    }
+    const element = document.querySelector<HTMLElement>(
+      `[data-task-id="${String(active.id)}"]`
+    );
+    setActiveWidth(element?.offsetWidth ?? null);
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveTaskId(null);
+    setActiveWidth(null);
     if (!over) {
       return;
     }
@@ -499,10 +510,13 @@ export default function MatrixPage() {
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={closestCorners}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveTaskId(null)}
+          onDragCancel={() => {
+            setActiveTaskId(null);
+            setActiveWidth(null);
+          }}
         >
           <form
             onSubmit={handleSubmit}
@@ -538,7 +552,11 @@ export default function MatrixPage() {
           />
 
           <DragOverlay>
-            {activeTask ? buildOverlayTask(activeTask) : null}
+            {activeTask ? (
+              <div style={{ width: activeWidth ?? "auto" }}>
+                {buildOverlayTask(activeTask)}
+              </div>
+            ) : null}
           </DragOverlay>
         </DndContext>
       </div>
