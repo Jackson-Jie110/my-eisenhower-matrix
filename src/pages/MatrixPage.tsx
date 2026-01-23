@@ -254,55 +254,54 @@ export default function MatrixPage() {
       return;
     }
 
-    const currentKey = `tasks_${resolvedDate}`;
-    const currentRaw = localStorage.getItem(currentKey);
-    const currentTasks = parseTasks(currentRaw);
+    const timer = window.setTimeout(() => {
+      const currentKey = `tasks_${resolvedDate}`;
+      const yesterday = dayjs(resolvedDate)
+        .subtract(1, "day")
+        .format("YYYY-MM-DD");
+      const yesterdayKey = `tasks_${yesterday}`;
 
-    if (currentTasks.length > 0) {
-      const startOfDay = dayjs(resolvedDate).startOf("day").valueOf();
-      const allBeforeToday = currentTasks.every(
-        (task) =>
-          typeof task.createdAt === "number" && task.createdAt < startOfDay
-      );
-      if (allBeforeToday && currentRaw) {
-        const hasDuplicate = Object.keys(localStorage)
-          .filter((key) => key.startsWith("tasks_") && key !== currentKey)
-          .some((key) => localStorage.getItem(key) === currentRaw);
-        if (hasDuplicate) {
-          localStorage.setItem(currentKey, JSON.stringify([]));
-          if (currentDate === resolvedDate) {
-            clearAllTasks();
-          }
+      console.log("[Migration Check] Target Date:", resolvedDate);
+      console.log("[Migration Check] Yesterday:", yesterday);
+
+      const currentJson = localStorage.getItem(currentKey);
+      const yesterdayJson = localStorage.getItem(yesterdayKey);
+
+      const currentTasks = currentJson ? parseTasks(currentJson) : [];
+      console.log("[Migration Check] Current Tasks:", currentTasks);
+
+      if (currentTasks.length > 0) {
+        const incompleteToday = currentTasks.filter((task) => !task.isCompleted);
+        if (incompleteToday.length > 0) {
+          console.log("Today implies busy, skip");
           return;
         }
       }
-    }
 
-    if (currentTasks.length > 0) {
-      return;
-    }
-
-    const yesterdayKey = `tasks_${dayjs(resolvedDate)
-      .subtract(1, "day")
-      .format("YYYY-MM-DD")}`;
-    const yesterdayRaw = localStorage.getItem(yesterdayKey);
-    if (!yesterdayRaw) {
-      return;
-    }
-    try {
-      const parsed = JSON.parse(yesterdayRaw) as unknown;
-      if (!Array.isArray(parsed)) {
+      if (!yesterdayJson) {
+        console.log("Yesterday empty, skip");
         return;
       }
-      const incomplete = (parsed as Task[]).filter((task) => !task.isCompleted);
+
+      const parsedYesterday = parseTasks(yesterdayJson);
+      console.log("[Migration Check] Found Yesterday Tasks:", parsedYesterday);
+      if (parsedYesterday.length === 0) {
+        console.log("Yesterday empty, skip");
+        return;
+      }
+
+      const incomplete = parsedYesterday.filter((task) => !task.isCompleted);
       if (incomplete.length > 0) {
         setYesterdayTasks(incomplete);
         setShowMigrationModal(true);
+        console.log("[Migration Check] MODAL TRIGGERED ✅");
+      } else {
+        console.log("[Migration Check] Yesterday all done, skipping.");
       }
-    } catch (error) {
-      console.error("Migration check failed", error);
-    }
-  }, [clearAllTasks, currentDate, resolvedDate]);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [resolvedDate]);
 
   React.useEffect(() => {
     const incompleteCount = tasks.filter((task) => !task.isCompleted).length;
