@@ -10,7 +10,7 @@ import {
   useSensor,
   useSensors,
   useDroppable,
-  closestCorners,
+  closestCenter,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -164,7 +164,6 @@ export default function MatrixPage() {
   const [title, setTitle] = React.useState("");
   const [context, setContext] = React.useState("");
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
-  const [activeWidth, setActiveWidth] = React.useState<number | null>(null);
   const [showMigrationModal, setShowMigrationModal] = React.useState(false);
   const [yesterdayTasks, setYesterdayTasks] = React.useState<Task[]>([]);
   const [pendingTaskAction, setPendingTaskAction] = React.useState<{
@@ -318,20 +317,10 @@ export default function MatrixPage() {
 
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveTaskId(String(active.id));
-    const rect = active.rect.current;
-    if (rect?.width) {
-      setActiveWidth(rect.width);
-      return;
-    }
-    const element = document.querySelector<HTMLElement>(
-      `[data-task-id="${String(active.id)}"]`
-    );
-    setActiveWidth(element?.offsetWidth ?? null);
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveTaskId(null);
-    setActiveWidth(null);
     if (!over) {
       return;
     }
@@ -510,13 +499,10 @@ export default function MatrixPage() {
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => {
-            setActiveTaskId(null);
-            setActiveWidth(null);
-          }}
+          onDragCancel={() => setActiveTaskId(null)}
         >
           <form
             onSubmit={handleSubmit}
@@ -552,11 +538,7 @@ export default function MatrixPage() {
           />
 
           <DragOverlay>
-            {activeTask ? (
-              <div style={{ width: activeWidth ?? "auto" }}>
-                {buildOverlayTask(activeTask)}
-              </div>
-            ) : null}
+            {activeTask ? buildOverlayTask(activeTask) : null}
           </DragOverlay>
         </DndContext>
       </div>

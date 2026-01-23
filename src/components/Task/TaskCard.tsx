@@ -55,7 +55,6 @@ export function TaskCard({
     <Card
       ref={setNodeRef}
       style={style}
-      data-task-id={task.id}
       {...listeners}
       {...attributes}
       className={cn(
