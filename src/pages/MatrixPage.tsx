@@ -172,7 +172,7 @@ export default function MatrixPage() {
   } | null>(null);
 
   const prevIncompleteCount = React.useRef(0);
-  const hasCheckedMigration = React.useRef(false);
+  const migrationCheckedDate = React.useRef<string | null>(null);
   const titleInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const resolvedDate = React.useMemo(() => {
@@ -238,33 +238,63 @@ export default function MatrixPage() {
     loadTasksByDate(resolvedDate);
     setShowMigrationModal(false);
     setYesterdayTasks([]);
-    hasCheckedMigration.current = false;
+    setPendingTaskAction(null);
   }, [loadTasksByDate, resolvedDate]);
 
   React.useEffect(() => {
-    if (!currentDate || hasCheckedMigration.current) {
+    if (!currentDate) {
       return;
     }
-    const currentTasks = parseTasks(
-      localStorage.getItem(`tasks_${currentDate}`)
-    );
+    if (migrationCheckedDate.current === currentDate) {
+      return;
+    }
+    migrationCheckedDate.current = currentDate;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const currentKey = `tasks_${currentDate}`;
+    const currentRaw = localStorage.getItem(currentKey);
+    const currentTasks = parseTasks(currentRaw);
+
     if (currentTasks.length > 0) {
-      hasCheckedMigration.current = true;
-      return;
+      const startOfDay = dayjs(currentDate).startOf("day").valueOf();
+      const allBeforeToday = currentTasks.every(
+        (task) =>
+          typeof task.createdAt === "number" && task.createdAt < startOfDay
+      );
+      if (allBeforeToday && currentRaw) {
+        const hasDuplicate = Object.keys(localStorage)
+          .filter((key) => key.startsWith("tasks_") && key !== currentKey)
+          .some((key) => localStorage.getItem(key) === currentRaw);
+        if (hasDuplicate) {
+          clearAllTasks();
+          return;
+        }
+      }
     }
-    const yesterday = dayjs(currentDate)
+
+    const strictYesterday = dayjs(currentDate)
       .subtract(1, "day")
       .format("YYYY-MM-DD");
-    const yesterdayAll = parseTasks(
-      localStorage.getItem(`tasks_${yesterday}`)
-    );
-    const incomplete = yesterdayAll.filter((task) => !task.isCompleted);
-    if (incomplete.length > 0) {
+    const strictYesterdayRaw = localStorage.getItem(`tasks_${strictYesterday}`);
+    if (!strictYesterdayRaw) {
+      return;
+    }
+    const strictYesterdayTasks = parseTasks(strictYesterdayRaw);
+    if (strictYesterdayTasks.length === 0) {
+      return;
+    }
+    const incomplete = strictYesterdayTasks.filter((task) => !task.isCompleted);
+    if (incomplete.length === 0) {
+      return;
+    }
+    if (currentTasks.length === 0) {
       setYesterdayTasks(incomplete);
       setShowMigrationModal(true);
     }
-    hasCheckedMigration.current = true;
-  }, [currentDate]);
+  }, [clearAllTasks, currentDate]);
 
   React.useEffect(() => {
     const incompleteCount = tasks.filter((task) => !task.isCompleted).length;

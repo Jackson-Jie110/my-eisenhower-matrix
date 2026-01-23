@@ -69,36 +69,6 @@ const buildEntry = (date: string): DateEntry => {
   };
 };
 
-const seedMockData = () => {
-  const mockDates = [
-    dayjs().subtract(1, "day"),
-    dayjs().subtract(1, "month"),
-    dayjs().subtract(1, "year"),
-  ];
-
-  mockDates.forEach((date) => {
-    const formatted = date.format("YYYY-MM-DD");
-    const tasks: Task[] = [
-      {
-        id: `mock-${formatted}-1`,
-        title: "示例任务",
-        context: "来自开发环境的演示数据",
-        quadrantId: null,
-        isCompleted: false,
-        createdAt: date.valueOf(),
-      },
-      {
-        id: `mock-${formatted}-2`,
-        title: "已完成的示例任务",
-        quadrantId: "q2",
-        isCompleted: true,
-        createdAt: date.valueOf(),
-      },
-    ];
-    localStorage.setItem(`tasks_${formatted}`, JSON.stringify(tasks));
-  });
-};
-
 const ArchiveCard = ({
   entry,
   highlight,
@@ -197,13 +167,6 @@ export default function ArchivePage() {
     let keys = Object.keys(localStorage).filter((key) =>
       key.startsWith("tasks_")
     );
-
-    if (keys.length === 0 && import.meta.env.DEV) {
-      seedMockData();
-      keys = Object.keys(localStorage).filter((key) =>
-        key.startsWith("tasks_")
-      );
-    }
 
     const parsed = keys
       .map((key) => key.replace("tasks_", ""))

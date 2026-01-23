@@ -26,9 +26,6 @@ type TaskStore = {
 
 const STORAGE_PREFIX = "tasks_";
 const RECYCLE_PREFIX = "recycle_";
-const LEGACY_KEY = "tasks";
-const PERSIST_KEY = "flat-matrix-storage";
-
 const getStorageKey = (date: string) => `${STORAGE_PREFIX}${date}`;
 const getRecycleKey = (date: string) => `${RECYCLE_PREFIX}${date}`;
 
@@ -58,28 +55,6 @@ const saveTasks = (date: string, tasks: Task[]) => {
   localStorage.setItem(getStorageKey(date), JSON.stringify(tasks));
 };
 
-const migrateLegacyTasks = (today: string) => {
-  const todayKey = getStorageKey(today);
-  if (localStorage.getItem(todayKey)) {
-    return;
-  }
-
-  const legacy = localStorage.getItem(LEGACY_KEY);
-  if (legacy) {
-    localStorage.setItem(todayKey, legacy);
-    localStorage.removeItem(LEGACY_KEY);
-    return;
-  }
-
-  const persisted = localStorage.getItem(PERSIST_KEY);
-  if (persisted) {
-    const tasks = parseTasks(persisted);
-    if (tasks.length > 0) {
-      localStorage.setItem(todayKey, JSON.stringify(tasks));
-    }
-  }
-};
-
 const resolveDate = (date?: string) => {
   const target = date ? dayjs(date) : dayjs();
   return target.isValid()
@@ -90,7 +65,6 @@ const resolveDate = (date?: string) => {
 const initializeStore = () => {
   const today = resolveDate();
   if (typeof window !== "undefined") {
-    migrateLegacyTasks(today);
     return {
       currentDate: today,
       tasks: parseTasks(localStorage.getItem(getStorageKey(today))),
