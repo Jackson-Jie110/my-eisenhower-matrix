@@ -265,28 +265,26 @@ export default function MatrixPage() {
       }`
     );
 
-    if (currentJson) {
-      const currentTasks = JSON.parse(currentJson) as Task[];
-      if (currentTasks.length > 0) {
-        console.warn("🛑 [Migration] Today already has tasks. Skip.");
-        return;
-      }
-    }
-
     if (yesterdayJson) {
-      const prevTasks = JSON.parse(yesterdayJson) as Task[];
-      const incomplete = prevTasks.filter((task) => !task.isCompleted);
+      try {
+        const prevTasks = JSON.parse(yesterdayJson) as Task[];
+        const incomplete = prevTasks.filter((task) => !task.isCompleted);
 
-      console.warn(
-        `📊 [Migration] Yesterday incomplete count: ${incomplete.length}`
-      );
+        console.warn(
+          `📊 [Migration] Yesterday incomplete count: ${incomplete.length}`
+        );
 
-      if (incomplete.length > 0) {
-        console.warn("✅ [Migration] TRIGGERING MODAL NOW!");
-        setYesterdayTasks(incomplete);
-        setShowMigrationModal(true);
-      } else {
-        console.warn("🛑 [Migration] Yesterday all done. Skip.");
+        if (incomplete.length > 0) {
+          console.warn(
+            "✅ [Migration] TRIGGERING MODAL NOW! (Reason: Found incomplete tasks)"
+          );
+          setYesterdayTasks(incomplete);
+          setShowMigrationModal(true);
+        } else {
+          console.warn("🛑 [Migration] Yesterday all done. Skip.");
+        }
+      } catch (error) {
+        console.error("❌ [Migration] JSON Parse Error:", error);
       }
     } else {
       console.warn("🛑 [Migration] No data found for yesterday. Skip.");
