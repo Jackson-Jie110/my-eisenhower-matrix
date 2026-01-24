@@ -251,19 +251,16 @@ export default function MatrixPage() {
 
     const currentKey = `tasks_${currentFormat}`;
     const yesterdayKey = `tasks_${yesterdayFormat}`;
+    const promptKey = `migration_prompted_${currentFormat}`;
 
-    console.warn(
-      `🔍 [Migration Check] Start. Today: ${currentKey}, Yesterday: ${yesterdayKey}`
-    );
+    console.warn(`🔍 [Migration Check] Start. Today: ${currentKey}`);
 
-    const currentJson = localStorage.getItem(currentKey);
+    if (localStorage.getItem(promptKey) === "true") {
+      console.warn("🛑 [Migration] Already prompted today (Flag exists). Skip.");
+      return;
+    }
+
     const yesterdayJson = localStorage.getItem(yesterdayKey);
-
-    console.warn(
-      `📂 [Storage Content] Today len: ${currentJson?.length || 0}, Yesterday len: ${
-        yesterdayJson?.length || 0
-      }`
-    );
 
     if (yesterdayJson) {
       try {
@@ -276,8 +273,9 @@ export default function MatrixPage() {
 
         if (incomplete.length > 0) {
           console.warn(
-            "✅ [Migration] TRIGGERING MODAL NOW! (Reason: Found incomplete tasks)"
+            "✅ [Migration] First time check passed. TRIGGERING MODAL & SETTING FLAG."
           );
+          localStorage.setItem(promptKey, "true");
           setYesterdayTasks(incomplete);
           setShowMigrationModal(true);
         } else {
