@@ -183,6 +183,8 @@ export default function MatrixPage() {
     return dayjs().format("YYYY-MM-DD");
   }, [params.date]);
 
+  console.warn("⚡️ [MatrixPage] Component Rendered. Route Date:", resolvedDate);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -242,65 +244,53 @@ export default function MatrixPage() {
   }, [loadTasksByDate, resolvedDate]);
 
   React.useEffect(() => {
-    if (!resolvedDate) {
-      return;
-    }
-    if (migrationCheckedDate.current === resolvedDate) {
-      return;
-    }
-    migrationCheckedDate.current = resolvedDate;
+    const currentFormat = dayjs(resolvedDate).format("YYYY-MM-DD");
+    const yesterdayFormat = dayjs(resolvedDate)
+      .subtract(1, "day")
+      .format("YYYY-MM-DD");
 
-    if (typeof window === "undefined") {
-      return;
-    }
+    const currentKey = `tasks_${currentFormat}`;
+    const yesterdayKey = `tasks_${yesterdayFormat}`;
 
-    const timer = window.setTimeout(() => {
-      const currentKey = `tasks_${resolvedDate}`;
-      const yesterday = dayjs(resolvedDate)
-        .subtract(1, "day")
-        .format("YYYY-MM-DD");
-      const yesterdayKey = `tasks_${yesterday}`;
+    console.warn(
+      `🔍 [Migration Check] Start. Today: ${currentKey}, Yesterday: ${yesterdayKey}`
+    );
 
-      console.log("[Migration Check] Target Date:", resolvedDate);
-      console.log("[Migration Check] Yesterday:", yesterday);
+    const currentJson = localStorage.getItem(currentKey);
+    const yesterdayJson = localStorage.getItem(yesterdayKey);
 
-      const currentJson = localStorage.getItem(currentKey);
-      const yesterdayJson = localStorage.getItem(yesterdayKey);
+    console.warn(
+      `📂 [Storage Content] Today len: ${currentJson?.length || 0}, Yesterday len: ${
+        yesterdayJson?.length || 0
+      }`
+    );
 
-      const currentTasks = currentJson ? parseTasks(currentJson) : [];
-      console.log("[Migration Check] Current Tasks:", currentTasks);
-
+    if (currentJson) {
+      const currentTasks = JSON.parse(currentJson) as Task[];
       if (currentTasks.length > 0) {
-        const incompleteToday = currentTasks.filter((task) => !task.isCompleted);
-        if (incompleteToday.length > 0) {
-          console.log("Today implies busy, skip");
-          return;
-        }
-      }
-
-      if (!yesterdayJson) {
-        console.log("Yesterday empty, skip");
+        console.warn("🛑 [Migration] Today already has tasks. Skip.");
         return;
       }
+    }
 
-      const parsedYesterday = parseTasks(yesterdayJson);
-      console.log("[Migration Check] Found Yesterday Tasks:", parsedYesterday);
-      if (parsedYesterday.length === 0) {
-        console.log("Yesterday empty, skip");
-        return;
-      }
+    if (yesterdayJson) {
+      const prevTasks = JSON.parse(yesterdayJson) as Task[];
+      const incomplete = prevTasks.filter((task) => !task.isCompleted);
 
-      const incomplete = parsedYesterday.filter((task) => !task.isCompleted);
+      console.warn(
+        `📊 [Migration] Yesterday incomplete count: ${incomplete.length}`
+      );
+
       if (incomplete.length > 0) {
+        console.warn("✅ [Migration] TRIGGERING MODAL NOW!");
         setYesterdayTasks(incomplete);
         setShowMigrationModal(true);
-        console.log("[Migration Check] MODAL TRIGGERED ✅");
       } else {
-        console.log("[Migration Check] Yesterday all done, skipping.");
+        console.warn("🛑 [Migration] Yesterday all done. Skip.");
       }
-    }, 300);
-
-    return () => window.clearTimeout(timer);
+    } else {
+      console.warn("🛑 [Migration] No data found for yesterday. Skip.");
+    }
   }, [resolvedDate]);
 
   React.useEffect(() => {
