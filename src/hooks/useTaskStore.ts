@@ -8,6 +8,10 @@ type TaskStore = {
   currentDate: string;
   tasks: Task[];
   addTask: (title: string, context?: string) => void;
+  updateTaskDetails: (
+    taskId: string,
+    updates: { title?: string; context?: string }
+  ) => void;
   updateTaskQuadrant: (taskId: string, quadrantId: QuadrantId | null) => void;
   toggleTaskCompletion: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
@@ -100,6 +104,17 @@ const useTaskStore = create<TaskStore>((set, get) => ({
 
     set((state) => {
       const updated = [newTask, ...state.tasks];
+      if (typeof window !== "undefined") {
+        saveTasks(state.currentDate, updated);
+      }
+      return { tasks: updated };
+    });
+  },
+  updateTaskDetails: (taskId, updates) => {
+    set((state) => {
+      const updated = state.tasks.map((task) =>
+        task.id === taskId ? { ...task, ...updates } : task
+      );
       if (typeof window !== "undefined") {
         saveTasks(state.currentDate, updated);
       }

@@ -16,6 +16,10 @@ export interface AppState {
     taskId: string,
     updates: Partial<Omit<Task, "id" | "createdAt">>
   ) => void;
+  updateTaskDetails: (
+    taskId: string,
+    updates: { title?: string; context?: string }
+  ) => void;
   removeTask: (taskId: string) => void;
   moveTask: (taskId: string, quadrantId: QuadrantId | null) => void;
   toggleTask: (taskId: string) => void;
