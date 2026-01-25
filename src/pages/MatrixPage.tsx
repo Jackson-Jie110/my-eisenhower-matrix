@@ -23,7 +23,6 @@ import type { QuadrantId, Task } from "../types";
 import { MatrixGrid } from "../components/Matrix/MatrixGrid";
 import { TaskCard } from "../components/Task/TaskCard";
 import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
 import { Input } from "../components/ui/Input";
 import { ParticlesBackground } from "../components/ui/ParticlesBackground";
@@ -55,33 +54,6 @@ const parseTasks = (raw: string | null) => {
   }
   return [] as Task[];
 };
-
-const buildOverlayTask = (task: Task) => (
-  <Card className="w-64 border border-glass-border bg-glass-100 text-white backdrop-blur-sm">
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p
-          className={cn(
-            "text-sm font-semibold text-slate-100",
-            task.isCompleted && "line-through"
-          )}
-        >
-          {task.title}
-        </p>
-        {task.context ? (
-          <p
-            className={cn(
-              "mt-1 text-xs text-slate-300",
-              task.isCompleted && "line-through"
-            )}
-          >
-            {task.context}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  </Card>
-);
 
 function BacklogPanel({
   tasks,
@@ -644,8 +616,21 @@ export default function MatrixPage() {
             selectedTaskId={selectedTaskId}
           />
 
-          <DragOverlay>
-            {activeTask ? buildOverlayTask(activeTask) : null}
+          <DragOverlay dropAnimation={null}>
+            {activeTask ? (
+              <div className="w-[320px] opacity-80 cursor-grabbing">
+                <TaskCard
+                  task={activeTask}
+                  index={0}
+                  totalInQuadrant={1}
+                  containerId={activeTask.quadrantId ?? BACKLOG_ID}
+                  onRequestDelete={requestTaskDelete}
+                  onRequestSnooze={requestTaskSnooze}
+                  isOverlay
+                  className="w-full"
+                />
+              </div>
+            ) : null}
           </DragOverlay>
         </DndContext>
       </div>
@@ -669,36 +654,40 @@ export default function MatrixPage() {
             role="presentation"
           />
           <div className="relative w-full max-w-sm rounded-2xl border border-glass-border bg-slate-900/90 p-6 text-white backdrop-blur-xl">
-            <h2 className="text-lg font-semibold">快捷键</h2>
+            <h2 className="text-lg font-semibold">{"快捷键"}</h2>
             <ul className="mt-4 space-y-2 text-sm text-slate-300">
               <li>
                 <span className="font-semibold text-white">1-9</span>
-                {" "}??????
+                {" 选中待办任务"}
               </li>
               <li>
                 <span className="font-semibold text-white">Alt + 1</span>
-                {" "}???????? 1 ??
+                {" 退出输入并选中第 1 任务"}
               </li>
               <li>
                 <span className="font-semibold text-white">Q/W/E/R</span>
-                {" "}??????
+                {" 移动至四象限"}
               </li>
               <li>
                 <span className="font-semibold text-white">Delete/Backspace</span>
-                {" "}??????
+                {" 删除选中任务"}
               </li>
               <li>
                 <span className="font-semibold text-white">Enter</span>
-                {" "}?????
+                {" 聚焦输入框"}
               </li>
               <li>
                 <span className="font-semibold text-white">Esc</span>
-                {" "}??/??
+                {" 取消/关闭"}
               </li>
             </ul>
             <div className="mt-6 flex justify-end">
-              <Button type="button" variant="outline" onClick={() => setShowShortcutHelp(false)}>
-                关闭
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowShortcutHelp(false)}
+              >
+                {"关闭"}
               </Button>
             </div>
           </div>
