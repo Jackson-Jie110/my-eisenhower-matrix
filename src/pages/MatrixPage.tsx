@@ -1,7 +1,15 @@
 import React from "react";
 import dayjs from "dayjs";
-import { motion } from "framer-motion";
-import { ChevronLeft, Keyboard, ListEnd, RotateCcw, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  Keyboard,
+  ListEnd,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   DndContext,
@@ -39,6 +47,12 @@ const MIGRATION_PREFERENCE_KEY = "migration_preference";
 const DELETED_TASKS_KEY = "deleted_tasks_v1";
 const MAX_DELETED_TASKS = 200;
 const quadrantIds: QuadrantId[] = ["q1", "q2", "q3", "q4"];
+const quadrantLabelById: Record<QuadrantId, string> = {
+  q1: "重要且紧急",
+  q2: "重要不紧急",
+  q3: "紧急不重要",
+  q4: "不重要不紧急",
+};
 
 type MigrationPreference = "import" | "skip";
 type DeletedTaskEntry = {
@@ -95,26 +109,11 @@ const getFilterButtonClasses = (isActive: boolean) =>
       : "bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
   );
 
-const quadrantChipStyles: Record<QuadrantId, { base: string; active: string }> = {
-  q1: {
-    base: "bg-red-500/10 text-red-300 border border-red-500/20 hover:bg-red-500/20",
-    active:
-      "bg-red-500 text-white border border-red-500/40 shadow-lg shadow-red-500/20",
-  },
-  q2: {
-    base: "bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20",
-    active:
-      "bg-amber-500 text-white border border-amber-500/40 shadow-lg shadow-amber-500/20",
-  },
-  q3: {
-    base: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20",
-    active:
-      "bg-emerald-500 text-white border border-emerald-500/40 shadow-lg shadow-emerald-500/20",
-  },
-  q4: {
-    base: "bg-slate-800/60 text-slate-200 border border-white/10 hover:bg-slate-800",
-    active: "bg-slate-500 text-white border border-white/20 shadow-lg shadow-black/20",
-  },
+const quadrantMenuItemStyles: Record<QuadrantId, { base: string; active: string }> = {
+  q1: { base: "text-red-200", active: "bg-red-500/20 text-red-100" },
+  q2: { base: "text-amber-200", active: "bg-amber-500/20 text-amber-100" },
+  q3: { base: "text-emerald-200", active: "bg-emerald-500/20 text-emerald-100" },
+  q4: { base: "text-slate-200", active: "bg-slate-500/25 text-slate-100" },
 };
 
 function BacklogPanel({
@@ -214,6 +213,7 @@ export default function MatrixPage() {
   const [quadrantFilter, setQuadrantFilter] = React.useState<
     "all" | "backlog" | QuadrantId
   >("all");
+  const [isQuadrantDropdownOpen, setIsQuadrantDropdownOpen] = React.useState(false);
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
   const [showMigrationModal, setShowMigrationModal] = React.useState(false);
   const [rememberMigrationChoice, setRememberMigrationChoice] =
@@ -238,12 +238,14 @@ export default function MatrixPage() {
   const prevIncompleteCount = React.useRef(0);
   const migrationCheckedDate = React.useRef<string | null>(null);
   const titleInputRef = React.useRef<HTMLInputElement | null>(null);
+  const quadrantDropdownRef = React.useRef<HTMLDivElement | null>(null);
   const undoTimerRef = React.useRef<number | null>(null);
 
   const handleResetFilters = React.useCallback(() => {
     setSearchQuery("");
     setStatusFilter("all");
     setQuadrantFilter("all");
+    setIsQuadrantDropdownOpen(false);
   }, []);
 
   const readMigrationPreference = React.useCallback(() => {
@@ -310,6 +312,31 @@ export default function MatrixPage() {
       }
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!isQuadrantDropdownOpen || typeof window === "undefined") {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      const root = quadrantDropdownRef.current;
+      if (root && !root.contains(target)) {
+        setIsQuadrantDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [isQuadrantDropdownOpen]);
 
   const resolvedDate = React.useMemo(() => {
     const dateParam = params.date;
@@ -432,6 +459,10 @@ export default function MatrixPage() {
       setPendingTaskAction(null);
       return;
     }
+    if (isQuadrantDropdownOpen) {
+      setIsQuadrantDropdownOpen(false);
+      return;
+    }
     if (showMigrationModal) {
       setShowMigrationModal(false);
       setYesterdayTasks([]);
@@ -444,7 +475,13 @@ export default function MatrixPage() {
     if (showShortcutHelp) {
       setShowShortcutHelp(false);
     }
-  }, [pendingTaskAction, showDeletedTasksModal, showMigrationModal, showShortcutHelp]);
+  }, [
+    isQuadrantDropdownOpen,
+    pendingTaskAction,
+    showDeletedTasksModal,
+    showMigrationModal,
+    showShortcutHelp,
+  ]);
 
   const normalizedQuery = React.useMemo(
     () => searchQuery.trim().toLowerCase(),
@@ -454,6 +491,27 @@ export default function MatrixPage() {
     normalizedQuery.length > 0 ||
     statusFilter !== "all" ||
     quadrantFilter !== "all";
+
+  const quadrantFilterLabel = React.useMemo(() => {
+    if (quadrantFilter === "all") {
+      return "所有象限";
+    }
+    if (quadrantFilter === "backlog") {
+      return "待办池";
+    }
+    if (isQuadrantId(quadrantFilter)) {
+      return `${quadrantFilter.toUpperCase()} ${quadrantLabelById[quadrantFilter]}`;
+    }
+    return "所有象限";
+  }, [quadrantFilter]);
+
+  const handleQuadrantOptionSelect = React.useCallback(
+    (value: "all" | "backlog" | QuadrantId) => {
+      setQuadrantFilter(value);
+      setIsQuadrantDropdownOpen(false);
+    },
+    []
+  );
 
   const visibleTasks = React.useMemo(() => {
     return tasks.filter((task) => {
@@ -491,7 +549,13 @@ export default function MatrixPage() {
 
   const handleSelectTask = React.useCallback(
     (index: number) => {
-      if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
+      if (
+        showMigrationModal ||
+        pendingTaskAction ||
+        showShortcutHelp ||
+        showDeletedTasksModal ||
+        isQuadrantDropdownOpen
+      ) {
         return;
       }
       const target = backlogTasks[index - 1];
@@ -502,6 +566,7 @@ export default function MatrixPage() {
     },
     [
       backlogTasks,
+      isQuadrantDropdownOpen,
       pendingTaskAction,
       showDeletedTasksModal,
       showMigrationModal,
@@ -511,7 +576,13 @@ export default function MatrixPage() {
 
   const handleMoveTask = React.useCallback(
     (quadrantId: QuadrantId) => {
-      if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
+      if (
+        showMigrationModal ||
+        pendingTaskAction ||
+        showShortcutHelp ||
+        showDeletedTasksModal ||
+        isQuadrantDropdownOpen
+      ) {
         return;
       }
       if (!selectedTaskId) {
@@ -521,6 +592,7 @@ export default function MatrixPage() {
       setSelectedTaskId(null);
     },
     [
+      isQuadrantDropdownOpen,
       pendingTaskAction,
       selectedTaskId,
       showDeletedTasksModal,
@@ -547,6 +619,7 @@ export default function MatrixPage() {
     setPendingTaskAction(null);
     setSelectedTaskId(null);
     setShowShortcutHelp(false);
+    setIsQuadrantDropdownOpen(false);
     setShowDeletedTasksModal(false);
     setShowAllDeletedTasks(false);
     setUndoDeleteEntry(null);
@@ -819,7 +892,13 @@ export default function MatrixPage() {
   }, [persistDeletedTaskEntries]);
 
   const handleFocusBacklog = React.useCallback(() => {
-    if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
+    if (
+      showMigrationModal ||
+      pendingTaskAction ||
+      showShortcutHelp ||
+      showDeletedTasksModal ||
+      isQuadrantDropdownOpen
+    ) {
       return;
     }
     if (typeof document !== "undefined") {
@@ -836,6 +915,7 @@ export default function MatrixPage() {
     }
   }, [
     backlogTasks,
+    isQuadrantDropdownOpen,
     pendingTaskAction,
     showDeletedTasksModal,
     showMigrationModal,
@@ -843,7 +923,13 @@ export default function MatrixPage() {
   ]);
 
   const handleDeleteSelected = React.useCallback(() => {
-    if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
+    if (
+      showMigrationModal ||
+      pendingTaskAction ||
+      showShortcutHelp ||
+      showDeletedTasksModal ||
+      isQuadrantDropdownOpen
+    ) {
       return;
     }
     if (!selectedTaskId) {
@@ -857,6 +943,7 @@ export default function MatrixPage() {
     setSelectedTaskId(null);
   }, [
     backlogTasks,
+    isQuadrantDropdownOpen,
     pendingTaskAction,
     requestTaskDelete,
     selectedTaskId,
@@ -1078,50 +1165,88 @@ export default function MatrixPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap gap-2">
+              <div className="relative" ref={quadrantDropdownRef}>
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
-                  onClick={() => setQuadrantFilter("all")}
+                  aria-haspopup="menu"
+                  aria-expanded={isQuadrantDropdownOpen}
+                  onClick={() => setIsQuadrantDropdownOpen((prev) => !prev)}
                   className={cn(
-                    "h-9 px-3 text-xs",
-                    getFilterButtonClasses(quadrantFilter === "all")
+                    "h-9 max-w-[220px] px-3 text-xs border border-white/10 bg-slate-800/50 text-slate-200",
+                    "flex items-center gap-2 justify-between hover:bg-slate-800 hover:text-slate-100",
+                    isQuadrantDropdownOpen && "bg-slate-800 text-slate-100 ring-2 ring-neon-blue/40"
                   )}
                 >
-                  {"\u6240\u6709\u8c61\u9650"}
+                  <span className="min-w-0 truncate">{quadrantFilterLabel}</span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-transform",
+                      isQuadrantDropdownOpen && "rotate-180"
+                    )}
+                  />
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setQuadrantFilter("backlog")}
-                  className={cn(
-                    "h-9 px-3 text-xs",
-                    getFilterButtonClasses(quadrantFilter === "backlog")
-                  )}
-                >
-                  {"\u5f85\u529e\u6c60"}
-                </Button>
-                {quadrantIds.map((id) => {
-                  const styles = quadrantChipStyles[id];
-                  const isActive = quadrantFilter === id;
-                  return (
-                    <Button
-                      key={id}
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setQuadrantFilter(id)}
-                      className={cn(
-                        "h-9 px-3 text-xs",
-                        isActive ? styles.active : styles.base
-                      )}
+                <AnimatePresence>
+                  {isQuadrantDropdownOpen ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-slate-900/95 p-1 shadow-xl shadow-black/50 backdrop-blur-xl"
                     >
-                      {id.toUpperCase()}
-                    </Button>
-                  );
-                })}
+                      {([
+                        { value: "all" as const, label: "所有象限" },
+                        { value: "backlog" as const, label: "待办池" },
+                      ] as const).map((option) => {
+                        const isActive = quadrantFilter === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => handleQuadrantOptionSelect(option.value)}
+                            className={cn(
+                              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm",
+                              "transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue focus-visible:ring-offset-0",
+                              isActive
+                                ? "bg-blue-600/20 text-blue-100"
+                                : "text-slate-200 hover:bg-white/10"
+                            )}
+                          >
+                            <span>{option.label}</span>
+                            {isActive ? <Check className="h-4 w-4" /> : null}
+                          </button>
+                        );
+                      })}
+
+                      <div className="my-1 h-px bg-white/10" />
+
+                      {quadrantIds.map((id) => {
+                        const isActive = quadrantFilter === id;
+                        const styles = quadrantMenuItemStyles[id];
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => handleQuadrantOptionSelect(id)}
+                            className={cn(
+                              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm",
+                              "transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue focus-visible:ring-offset-0",
+                              isActive ? styles.active : cn(styles.base, "hover:bg-white/10")
+                            )}
+                          >
+                            <span>
+                              {id.toUpperCase()} {quadrantLabelById[id]}
+                            </span>
+                            {isActive ? <Check className="h-4 w-4" /> : null}
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </div>
               <Button
                 type="button"
