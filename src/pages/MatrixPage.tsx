@@ -1,7 +1,7 @@
 import React from "react";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
-import { ChevronLeft, Keyboard, ListEnd, Trash2 } from "lucide-react";
+import { ChevronLeft, Keyboard, ListEnd, RotateCcw, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   DndContext,
@@ -36,26 +36,55 @@ const pageMotion = {
 
 const BACKLOG_ID = "backlog";
 const MIGRATION_PREFERENCE_KEY = "migration_preference";
+const DELETED_TASKS_KEY = "deleted_tasks_v1";
+const MAX_DELETED_TASKS = 200;
 const quadrantIds: QuadrantId[] = ["q1", "q2", "q3", "q4"];
 
 type MigrationPreference = "import" | "skip";
+type DeletedTaskEntry = {
+  task: Task;
+  sourceDate: string;
+  deletedAt: number;
+};
 
 const isQuadrantId = (value: string): value is QuadrantId =>
   quadrantIds.includes(value as QuadrantId);
 
-const parseTasks = (raw: string | null) => {
+const parseTasks = (raw: string | null): Task[] => {
   if (!raw) {
-    return [] as Task[];
+    return [];
   }
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (Array.isArray(parsed)) {
       return parsed as Task[];
     }
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      Array.isArray((parsed as { state?: { tasks?: Task[] } }).state?.tasks)
+    ) {
+      return (parsed as { state: { tasks: Task[] } }).state.tasks;
+    }
   } catch {
-    return [] as Task[];
+    return [];
   }
-  return [] as Task[];
+  return [];
+};
+
+const parseDeletedTaskEntries = (raw: string | null): DeletedTaskEntry[] => {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed as DeletedTaskEntry[];
+    }
+  } catch {
+    return [];
+  }
+  return [];
 };
 
 function BacklogPanel({
@@ -167,10 +196,19 @@ export default function MatrixPage() {
     type: "delete" | "migrate";
     task: Task;
   } | null>(null);
+  const [deletedTaskEntries, setDeletedTaskEntries] = React.useState<
+    DeletedTaskEntry[]
+  >([]);
+  const [showDeletedTasksModal, setShowDeletedTasksModal] = React.useState(false);
+  const [showAllDeletedTasks, setShowAllDeletedTasks] = React.useState(false);
+  const [undoDeleteEntry, setUndoDeleteEntry] = React.useState<
+    DeletedTaskEntry | null
+  >(null);
 
   const prevIncompleteCount = React.useRef(0);
   const migrationCheckedDate = React.useRef<string | null>(null);
   const titleInputRef = React.useRef<HTMLInputElement | null>(null);
+  const undoTimerRef = React.useRef<number | null>(null);
 
   const handleResetFilters = React.useCallback(() => {
     setSearchQuery("");
@@ -223,6 +261,26 @@ export default function MatrixPage() {
     setMigrationPreference(readMigrationPreference());
   }, [readMigrationPreference]);
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    setDeletedTaskEntries(
+      parseDeletedTaskEntries(localStorage.getItem(DELETED_TASKS_KEY))
+    );
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (typeof window === "undefined") {
+        return;
+      }
+      if (undoTimerRef.current) {
+        window.clearTimeout(undoTimerRef.current);
+      }
+    };
+  }, []);
+
   const resolvedDate = React.useMemo(() => {
     const dateParam = params.date;
     if (dateParam && dayjs(dateParam, "YYYY-MM-DD", true).isValid()) {
@@ -258,6 +316,86 @@ export default function MatrixPage() {
     }
   }, []);
 
+  const persistDeletedTaskEntries = React.useCallback(
+    (updater: (prev: DeletedTaskEntry[]) => DeletedTaskEntry[]) => {
+      setDeletedTaskEntries((prev) => {
+        const next = updater(prev);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(DELETED_TASKS_KEY, JSON.stringify(next));
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const removeDeletedTaskEntry = React.useCallback(
+    (entry: DeletedTaskEntry) => {
+      persistDeletedTaskEntries((prev) =>
+        prev.filter(
+          (item) =>
+            !(item.task.id === entry.task.id && item.deletedAt === entry.deletedAt)
+        )
+      );
+    },
+    [persistDeletedTaskEntries]
+  );
+
+  const restoreDeletedTaskEntry = React.useCallback(
+    (entry: DeletedTaskEntry) => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      removeDeletedTaskEntry(entry);
+
+      if (entry.sourceDate === currentDate) {
+        if (!tasks.some((task) => task.id === entry.task.id)) {
+          importTasks([entry.task]);
+        }
+        return;
+      }
+
+      const storageKey = `tasks_${entry.sourceDate}`;
+      const existingTasks = parseTasks(localStorage.getItem(storageKey));
+      if (existingTasks.some((task) => task.id === entry.task.id)) {
+        return;
+      }
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify([entry.task, ...existingTasks])
+      );
+    },
+    [currentDate, importTasks, removeDeletedTaskEntry, tasks]
+  );
+
+  const performTaskDelete = React.useCallback(
+    (task: Task) => {
+      const entry: DeletedTaskEntry = {
+        task,
+        sourceDate: currentDate,
+        deletedAt: Date.now(),
+      };
+
+      persistDeletedTaskEntries((prev) =>
+        [entry, ...prev].slice(0, MAX_DELETED_TASKS)
+      );
+
+      setUndoDeleteEntry(entry);
+      if (typeof window !== "undefined") {
+        if (undoTimerRef.current) {
+          window.clearTimeout(undoTimerRef.current);
+        }
+        undoTimerRef.current = window.setTimeout(() => {
+          setUndoDeleteEntry(null);
+        }, 8000);
+      }
+
+      deleteTask(task.id);
+    },
+    [currentDate, deleteTask, persistDeletedTaskEntries]
+  );
+
   const handleEscape = React.useCallback(() => {
     setSelectedTaskId(null);
     if (pendingTaskAction) {
@@ -269,10 +407,14 @@ export default function MatrixPage() {
       setYesterdayTasks([]);
       return;
     }
+    if (showDeletedTasksModal) {
+      setShowDeletedTasksModal(false);
+      return;
+    }
     if (showShortcutHelp) {
       setShowShortcutHelp(false);
     }
-  }, [pendingTaskAction, showMigrationModal, showShortcutHelp]);
+  }, [pendingTaskAction, showDeletedTasksModal, showMigrationModal, showShortcutHelp]);
 
   const normalizedQuery = React.useMemo(
     () => searchQuery.trim().toLowerCase(),
@@ -319,7 +461,7 @@ export default function MatrixPage() {
 
   const handleSelectTask = React.useCallback(
     (index: number) => {
-      if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+      if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
         return;
       }
       const target = backlogTasks[index - 1];
@@ -328,12 +470,18 @@ export default function MatrixPage() {
       }
       setSelectedTaskId(target.id);
     },
-    [backlogTasks, pendingTaskAction, showMigrationModal, showShortcutHelp]
+    [
+      backlogTasks,
+      pendingTaskAction,
+      showDeletedTasksModal,
+      showMigrationModal,
+      showShortcutHelp,
+    ]
   );
 
   const handleMoveTask = React.useCallback(
     (quadrantId: QuadrantId) => {
-      if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+      if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
         return;
       }
       if (!selectedTaskId) {
@@ -345,6 +493,7 @@ export default function MatrixPage() {
     [
       pendingTaskAction,
       selectedTaskId,
+      showDeletedTasksModal,
       showMigrationModal,
       showShortcutHelp,
       updateTaskQuadrant,
@@ -368,6 +517,13 @@ export default function MatrixPage() {
     setPendingTaskAction(null);
     setSelectedTaskId(null);
     setShowShortcutHelp(false);
+    setShowDeletedTasksModal(false);
+    setShowAllDeletedTasks(false);
+    setUndoDeleteEntry(null);
+    if (typeof window !== "undefined" && undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
   }, [loadTasksByDate, resolvedDate]);
 
   React.useEffect(() => {
@@ -538,7 +694,7 @@ export default function MatrixPage() {
       return;
     }
     if (pendingTaskAction.type === "delete") {
-      deleteTask(pendingTaskAction.task.id);
+      performTaskDelete(pendingTaskAction.task);
     } else {
       snoozeTask(pendingTaskAction.task, currentDate);
     }
@@ -551,7 +707,7 @@ export default function MatrixPage() {
 
   const requestTaskDelete = (task: Task) => {
     if (isConfirmSuppressed("delete_task")) {
-      deleteTask(task.id);
+      performTaskDelete(task);
       return;
     }
     setPendingTaskAction({ type: "delete", task });
@@ -565,8 +721,75 @@ export default function MatrixPage() {
     setPendingTaskAction({ type: "migrate", task });
   };
 
+  const deletedTasksForCurrentDate = React.useMemo(
+    () => deletedTaskEntries.filter((entry) => entry.sourceDate === currentDate),
+    [currentDate, deletedTaskEntries]
+  );
+
+  const visibleDeletedTaskEntries = React.useMemo(() => {
+    return showAllDeletedTasks ? deletedTaskEntries : deletedTasksForCurrentDate;
+  }, [deletedTaskEntries, deletedTasksForCurrentDate, showAllDeletedTasks]);
+
+  const handleUndoDelete = React.useCallback(() => {
+    if (!undoDeleteEntry) {
+      return;
+    }
+    if (typeof window !== "undefined" && undoTimerRef.current) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    restoreDeletedTaskEntry(undoDeleteEntry);
+    setUndoDeleteEntry(null);
+  }, [restoreDeletedTaskEntry, undoDeleteEntry]);
+
+  const handleRestoreDeletedEntry = React.useCallback(
+    (entry: DeletedTaskEntry) => {
+      restoreDeletedTaskEntry(entry);
+      setUndoDeleteEntry((prev) =>
+        prev && prev.task.id === entry.task.id && prev.deletedAt === entry.deletedAt
+          ? null
+          : prev
+      );
+    },
+    [restoreDeletedTaskEntry]
+  );
+
+  const handlePermanentlyDeleteEntry = React.useCallback(
+    (entry: DeletedTaskEntry) => {
+      if (typeof window !== "undefined") {
+        const confirmed = window.confirm(
+          "确定要彻底删除该任务吗？此操作不可恢复。"
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+      removeDeletedTaskEntry(entry);
+      setUndoDeleteEntry((prev) =>
+        prev && prev.task.id === entry.task.id && prev.deletedAt === entry.deletedAt
+          ? null
+          : prev
+      );
+    },
+    [removeDeletedTaskEntry]
+  );
+
+  const handleEmptyDeletedTasks = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const confirmed = window.confirm(
+      "确定要清空任务回收站吗？此操作不可恢复。"
+    );
+    if (!confirmed) {
+      return;
+    }
+    persistDeletedTaskEntries(() => []);
+    setUndoDeleteEntry(null);
+  }, [persistDeletedTaskEntries]);
+
   const handleFocusBacklog = React.useCallback(() => {
-    if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+    if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
       return;
     }
     if (typeof document !== "undefined") {
@@ -581,10 +804,16 @@ export default function MatrixPage() {
     if (firstTask) {
       setSelectedTaskId(firstTask.id);
     }
-  }, [backlogTasks, pendingTaskAction, showMigrationModal, showShortcutHelp]);
+  }, [
+    backlogTasks,
+    pendingTaskAction,
+    showDeletedTasksModal,
+    showMigrationModal,
+    showShortcutHelp,
+  ]);
 
   const handleDeleteSelected = React.useCallback(() => {
-    if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+    if (showMigrationModal || pendingTaskAction || showShortcutHelp || showDeletedTasksModal) {
       return;
     }
     if (!selectedTaskId) {
@@ -601,6 +830,7 @@ export default function MatrixPage() {
     pendingTaskAction,
     requestTaskDelete,
     selectedTaskId,
+    showDeletedTasksModal,
     showMigrationModal,
     showShortcutHelp,
   ]);
@@ -622,11 +852,18 @@ export default function MatrixPage() {
 
   const confirmTitle =
     pendingTaskAction?.type === "delete" ? "删除任务" : "推迟任务";
-  const confirmMessage = pendingTaskAction
+  const confirmMessage: React.ReactNode = pendingTaskAction
     ? pendingTaskAction.type === "delete"
-      ? `确定删除“${pendingTaskAction.task.title}”吗？此操作不可恢复。`
+      ? (
+          <>
+            <p>确定删除“{pendingTaskAction.task.title}”吗？</p>
+            <p className="mt-2 text-xs text-slate-400">
+              删除后可在“任务回收站”找回，也可以在 8 秒内撤销。
+            </p>
+          </>
+        )
       : `确定将“${pendingTaskAction.task.title}”推迟到明天吗？`
-    : "";
+    : null;
   const confirmText =
     pendingTaskAction?.type === "delete" ? "删除" : "迁移";
   const confirmFeatureKey =
@@ -687,6 +924,20 @@ export default function MatrixPage() {
             >
               <Keyboard className="h-4 w-4" />
               <span className="hidden sm:inline">快捷键</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowDeletedTasksModal(true)}
+              className="flex items-center gap-2 border border-glass-border text-slate-200 hover:bg-white/10"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                任务回收站
+                {deletedTasksForCurrentDate.length > 0
+                  ? ` (${deletedTasksForCurrentDate.length})`
+                  : ""}
+              </span>
             </Button>
             <Button
               type="button"
@@ -873,6 +1124,104 @@ export default function MatrixPage() {
         featureKey={confirmFeatureKey}
       />
 
+      {showDeletedTasksModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowDeletedTasksModal(false)}
+            role="presentation"
+          />
+          <div className="relative w-full max-w-lg rounded-2xl border border-glass-border bg-slate-900/90 p-6 text-white backdrop-blur-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">任务回收站</h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  已删除的任务会保存在本地，可随时恢复或彻底删除。
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeletedTasksModal(false)}
+              >
+                关闭
+              </Button>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-xs text-slate-400">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border border-white/20 bg-transparent"
+                  checked={showAllDeletedTasks}
+                  onChange={(event) => setShowAllDeletedTasks(event.target.checked)}
+                />
+                显示全部日期
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleEmptyDeletedTasks}
+                className="border border-red-500/30 text-red-200 hover:bg-red-500/10"
+              >
+                清空回收站
+              </Button>
+            </div>
+
+            <div className="mt-4 max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+              {visibleDeletedTaskEntries.length === 0 ? (
+                <p className="text-sm text-slate-400">暂无已删除任务</p>
+              ) : (
+                visibleDeletedTaskEntries.map((entry) => (
+                  <div
+                    key={`${entry.task.id}_${entry.deletedAt}`}
+                    className="rounded-xl border border-white/10 bg-white/5 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-slate-100">
+                          {entry.task.title}
+                        </p>
+                        {entry.task.context ? (
+                          <p className="mt-1 truncate text-xs text-slate-400">
+                            {entry.task.context}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-slate-500">
+                          {entry.sourceDate} ·{" "}
+                          {dayjs(entry.deletedAt).format("HH:mm")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestoreDeletedEntry(entry)}
+                        >
+                          恢复
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handlePermanentlyDeleteEntry(entry)}
+                          className="border border-red-500/30 text-red-200 hover:bg-red-500/10"
+                        >
+                          彻底删除
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showShortcutHelp ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
@@ -915,6 +1264,38 @@ export default function MatrixPage() {
                 onClick={() => setShowShortcutHelp(false)}
               >
                 {"关闭"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {undoDeleteEntry &&
+      !pendingTaskAction &&
+      !showShortcutHelp &&
+      !showMigrationModal &&
+      !showDeletedTasksModal ? (
+        <div className="fixed bottom-6 left-1/2 z-50 w-[min(520px,calc(100%-2rem))] -translate-x-1/2 px-4">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-glass-border bg-slate-900/90 px-4 py-3 text-white backdrop-blur-xl">
+            <div className="min-w-0">
+              <p className="truncate text-sm text-slate-100">
+                已删除：{undoDeleteEntry.task.title}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                可撤销，或在任务回收站找回
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeletedTasksModal(true)}
+              >
+                回收站
+              </Button>
+              <Button type="button" variant="primary" size="sm" onClick={handleUndoDelete}>
+                撤销
               </Button>
             </div>
           </div>
