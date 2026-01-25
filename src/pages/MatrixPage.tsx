@@ -260,7 +260,14 @@ export default function MatrixPage() {
       return;
     }
 
+    const currentJson = localStorage.getItem(currentKey);
     const yesterdayJson = localStorage.getItem(yesterdayKey);
+
+    console.warn(
+      `📂 [Storage Content] Today len: ${currentJson?.length || 0}, Yesterday len: ${
+        yesterdayJson?.length || 0
+      }`
+    );
 
     if (yesterdayJson) {
       try {
