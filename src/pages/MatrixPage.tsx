@@ -1,7 +1,7 @@
 import React from "react";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
-import { ChevronLeft, ListEnd, Trash2 } from "lucide-react";
+import { ChevronLeft, Keyboard, ListEnd, Trash2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   DndContext,
@@ -10,7 +10,7 @@ import {
   useSensor,
   useSensors,
   useDroppable,
-  closestCenter,
+  pointerWithin,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -87,10 +87,12 @@ function BacklogPanel({
   tasks,
   onRequestDelete,
   onRequestSnooze,
+  selectedTaskId,
 }: {
   tasks: Task[];
   onRequestDelete: (task: Task) => void;
   onRequestSnooze: (task: Task) => void;
+  selectedTaskId?: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: BACKLOG_ID });
 
@@ -123,6 +125,7 @@ function BacklogPanel({
                 containerId={BACKLOG_ID}
                 onRequestDelete={onRequestDelete}
                 onRequestSnooze={onRequestSnooze}
+                isSelected={task.id === selectedTaskId}
               />
             ))
           )}
@@ -164,7 +167,9 @@ export default function MatrixPage() {
   const [title, setTitle] = React.useState("");
   const [context, setContext] = React.useState("");
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
   const [showMigrationModal, setShowMigrationModal] = React.useState(false);
+  const [showShortcutHelp, setShowShortcutHelp] = React.useState(false);
   const [yesterdayTasks, setYesterdayTasks] = React.useState<Task[]>([]);
   const [pendingTaskAction, setPendingTaskAction] = React.useState<{
     type: "delete" | "migrate";
@@ -211,6 +216,7 @@ export default function MatrixPage() {
   }, []);
 
   const handleEscape = React.useCallback(() => {
+    setSelectedTaskId(null);
     if (pendingTaskAction) {
       setPendingTaskAction(null);
       return;
@@ -218,13 +224,12 @@ export default function MatrixPage() {
     if (showMigrationModal) {
       setShowMigrationModal(false);
       setYesterdayTasks([]);
+      return;
     }
-  }, [pendingTaskAction, showMigrationModal]);
-
-  useKeyboardShortcuts({
-    inputRef: titleInputRef,
-    onEscape: handleEscape,
-  });
+    if (showShortcutHelp) {
+      setShowShortcutHelp(false);
+    }
+  }, [pendingTaskAction, showMigrationModal, showShortcutHelp]);
 
   const backlogTasks = React.useMemo(
     () => tasks.filter((task) => task.quadrantId == null),
@@ -236,11 +241,57 @@ export default function MatrixPage() {
     [tasks, activeTaskId]
   );
 
+  const handleSelectTask = React.useCallback(
+    (index: number) => {
+      if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+        return;
+      }
+      const target = backlogTasks[index - 1];
+      if (!target) {
+        return;
+      }
+      setSelectedTaskId(target.id);
+    },
+    [backlogTasks, pendingTaskAction, showMigrationModal, showShortcutHelp]
+  );
+
+  const handleMoveTask = React.useCallback(
+    (quadrantId: QuadrantId) => {
+      if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+        return;
+      }
+      if (!selectedTaskId) {
+        return;
+      }
+      updateTaskQuadrant(selectedTaskId, quadrantId);
+      setSelectedTaskId(null);
+    },
+    [
+      pendingTaskAction,
+      selectedTaskId,
+      showMigrationModal,
+      showShortcutHelp,
+      updateTaskQuadrant,
+    ]
+  );
+
+  React.useEffect(() => {
+    if (!selectedTaskId) {
+      return;
+    }
+    const selectedTask = tasks.find((task) => task.id === selectedTaskId);
+    if (!selectedTask || selectedTask.quadrantId !== null) {
+      setSelectedTaskId(null);
+    }
+  }, [selectedTaskId, tasks]);
+
   React.useEffect(() => {
     loadTasksByDate(resolvedDate);
     setShowMigrationModal(false);
     setYesterdayTasks([]);
     setPendingTaskAction(null);
+    setSelectedTaskId(null);
+    setShowShortcutHelp(false);
   }, [loadTasksByDate, resolvedDate]);
 
   React.useEffect(() => {
@@ -260,14 +311,7 @@ export default function MatrixPage() {
       return;
     }
 
-    const currentJson = localStorage.getItem(currentKey);
     const yesterdayJson = localStorage.getItem(yesterdayKey);
-
-    console.warn(
-      `📂 [Storage Content] Today len: ${currentJson?.length || 0}, Yesterday len: ${
-        yesterdayJson?.length || 0
-      }`
-    );
 
     if (yesterdayJson) {
       try {
@@ -420,6 +464,55 @@ export default function MatrixPage() {
     setPendingTaskAction({ type: "migrate", task });
   };
 
+  const handleFocusBacklog = React.useCallback(() => {
+    if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+      return;
+    }
+    if (typeof document !== "undefined") {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) {
+        active.blur();
+      }
+    } else {
+      titleInputRef.current?.blur();
+    }
+    const firstTask = backlogTasks[0];
+    if (firstTask) {
+      setSelectedTaskId(firstTask.id);
+    }
+  }, [backlogTasks, pendingTaskAction, showMigrationModal, showShortcutHelp]);
+
+  const handleDeleteSelected = React.useCallback(() => {
+    if (showMigrationModal || pendingTaskAction || showShortcutHelp) {
+      return;
+    }
+    if (!selectedTaskId) {
+      return;
+    }
+    const target = backlogTasks.find((task) => task.id === selectedTaskId);
+    if (!target) {
+      return;
+    }
+    requestTaskDelete(target);
+    setSelectedTaskId(null);
+  }, [
+    backlogTasks,
+    pendingTaskAction,
+    requestTaskDelete,
+    selectedTaskId,
+    showMigrationModal,
+    showShortcutHelp,
+  ]);
+
+  useKeyboardShortcuts({
+    inputRef: titleInputRef,
+    onEscape: handleEscape,
+    onSelectTask: handleSelectTask,
+    onMoveTask: handleMoveTask,
+    onFocusBacklog: handleFocusBacklog,
+    onDelete: handleDeleteSelected,
+  });
+
   const confirmTitle =
     pendingTaskAction?.type === "delete" ? "删除任务" : "推迟任务";
   const confirmMessage = pendingTaskAction
@@ -481,6 +574,15 @@ export default function MatrixPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
+              variant="ghost"
+              onClick={() => setShowShortcutHelp(true)}
+              className="flex items-center gap-2 border border-glass-border text-slate-200 hover:bg-white/10"
+            >
+              <Keyboard className="h-4 w-4" />
+              <span className="hidden sm:inline">快捷键</span>
+            </Button>
+            <Button
+              type="button"
               variant="outline"
               onClick={handleMigrateAllToTomorrow}
               className="flex items-center gap-2 border border-glass-border text-slate-200 hover:bg-white/10"
@@ -502,7 +604,7 @@ export default function MatrixPage() {
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragCancel={() => setActiveTaskId(null)}
@@ -533,11 +635,13 @@ export default function MatrixPage() {
             tasks={backlogTasks}
             onRequestDelete={requestTaskDelete}
             onRequestSnooze={requestTaskSnooze}
+            selectedTaskId={selectedTaskId}
           />
 
           <MatrixGrid
             onRequestDelete={requestTaskDelete}
             onRequestSnooze={requestTaskSnooze}
+            selectedTaskId={selectedTaskId}
           />
 
           <DragOverlay>
@@ -556,6 +660,50 @@ export default function MatrixPage() {
         isDanger={pendingTaskAction?.type === "delete"}
         featureKey={confirmFeatureKey}
       />
+
+      {showShortcutHelp ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowShortcutHelp(false)}
+            role="presentation"
+          />
+          <div className="relative w-full max-w-sm rounded-2xl border border-glass-border bg-slate-900/90 p-6 text-white backdrop-blur-xl">
+            <h2 className="text-lg font-semibold">快捷键</h2>
+            <ul className="mt-4 space-y-2 text-sm text-slate-300">
+              <li>
+                <span className="font-semibold text-white">1-9</span>
+                {" "}??????
+              </li>
+              <li>
+                <span className="font-semibold text-white">Alt + 1</span>
+                {" "}???????? 1 ??
+              </li>
+              <li>
+                <span className="font-semibold text-white">Q/W/E/R</span>
+                {" "}??????
+              </li>
+              <li>
+                <span className="font-semibold text-white">Delete/Backspace</span>
+                {" "}??????
+              </li>
+              <li>
+                <span className="font-semibold text-white">Enter</span>
+                {" "}?????
+              </li>
+              <li>
+                <span className="font-semibold text-white">Esc</span>
+                {" "}??/??
+              </li>
+            </ul>
+            <div className="mt-6 flex justify-end">
+              <Button type="button" variant="outline" onClick={() => setShowShortcutHelp(false)}>
+                关闭
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showMigrationModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">

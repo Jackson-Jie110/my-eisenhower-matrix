@@ -21,6 +21,7 @@ type TaskCardProps = {
   containerId: string;
   onRequestDelete: (task: Task) => void;
   onRequestSnooze: (task: Task) => void;
+  isSelected?: boolean;
 };
 
 export function TaskCard({
@@ -30,6 +31,7 @@ export function TaskCard({
   containerId,
   onRequestDelete,
   onRequestSnooze,
+  isSelected = false,
 }: TaskCardProps) {
   const toggleTaskCompletion = useTaskStore((state) => state.toggleTaskCompletion);
   const reorderTask = useTaskStore((state) => state.reorderTask);
@@ -62,6 +64,7 @@ export function TaskCard({
         "cursor-grab active:cursor-grabbing",
         "hover:brightness-110",
         task.isCompleted && "opacity-70",
+        isSelected && "ring-2 ring-blue-500/80 ring-offset-2 ring-offset-slate-900/40",
         isDragging && "opacity-50 z-50"
       )}
     >
