@@ -35,7 +35,10 @@ const pageMotion = {
 };
 
 const BACKLOG_ID = "backlog";
+const MIGRATION_PREFERENCE_KEY = "migration_preference";
 const quadrantIds: QuadrantId[] = ["q1", "q2", "q3", "q4"];
+
+type MigrationPreference = "import" | "skip";
 
 const isQuadrantId = (value: string): value is QuadrantId =>
   quadrantIds.includes(value as QuadrantId);
@@ -154,6 +157,10 @@ export default function MatrixPage() {
   >("all");
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
   const [showMigrationModal, setShowMigrationModal] = React.useState(false);
+  const [rememberMigrationChoice, setRememberMigrationChoice] =
+    React.useState(false);
+  const [migrationPreference, setMigrationPreference] =
+    React.useState<MigrationPreference | null>(null);
   const [showShortcutHelp, setShowShortcutHelp] = React.useState(false);
   const [yesterdayTasks, setYesterdayTasks] = React.useState<Task[]>([]);
   const [pendingTaskAction, setPendingTaskAction] = React.useState<{
@@ -170,6 +177,51 @@ export default function MatrixPage() {
     setStatusFilter("all");
     setQuadrantFilter("all");
   }, []);
+
+  const readMigrationPreference = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const raw = localStorage.getItem(MIGRATION_PREFERENCE_KEY);
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw) as { action?: MigrationPreference };
+      if (parsed?.action === "import" || parsed?.action === "skip") {
+        return parsed.action;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }, []);
+
+  const saveMigrationPreference = React.useCallback(
+    (action: MigrationPreference) => {
+      if (typeof window === "undefined") {
+        return;
+      }
+      localStorage.setItem(
+        MIGRATION_PREFERENCE_KEY,
+        JSON.stringify({ action })
+      );
+      setMigrationPreference(action);
+    },
+    []
+  );
+
+  const clearMigrationPreference = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    localStorage.removeItem(MIGRATION_PREFERENCE_KEY);
+    setMigrationPreference(null);
+  }, []);
+
+  React.useEffect(() => {
+    setMigrationPreference(readMigrationPreference());
+  }, [readMigrationPreference]);
 
   const resolvedDate = React.useMemo(() => {
     const dateParam = params.date;
@@ -335,6 +387,12 @@ export default function MatrixPage() {
       return;
     }
 
+    const preference = readMigrationPreference();
+    if (preference === "skip") {
+      localStorage.setItem(promptKey, "true");
+      return;
+    }
+
     const yesterdayJson = localStorage.getItem(yesterdayKey);
 
     if (yesterdayJson) {
@@ -347,6 +405,11 @@ export default function MatrixPage() {
         );
 
         if (incomplete.length > 0) {
+          if (preference === "import") {
+            importTasks(incomplete);
+            localStorage.setItem(promptKey, "true");
+            return;
+          }
           console.warn(
             "✅ [Migration] Incomplete tasks found. SHOWING MODAL (Flag will be set on user interaction)."
           );
@@ -361,7 +424,7 @@ export default function MatrixPage() {
     } else {
       console.warn("🛑 [Migration] No data found for yesterday. Skip.");
     }
-  }, [resolvedDate]);
+  }, [importTasks, readMigrationPreference, resolvedDate]);
 
   React.useEffect(() => {
     const incompleteCount = tasks.filter((task) => !task.isCompleted).length;
@@ -451,6 +514,9 @@ export default function MatrixPage() {
     if (yesterdayTasks.length > 0) {
       importTasks(yesterdayTasks);
     }
+    if (rememberMigrationChoice) {
+      saveMigrationPreference("import");
+    }
     const currentFormat = dayjs(resolvedDate).format("YYYY-MM-DD");
     localStorage.setItem(`migration_prompted_${currentFormat}`, "true");
     setShowMigrationModal(false);
@@ -458,6 +524,9 @@ export default function MatrixPage() {
   };
 
   const handleMigrationCancel = () => {
+    if (rememberMigrationChoice) {
+      saveMigrationPreference("skip");
+    }
     const currentFormat = dayjs(resolvedDate).format("YYYY-MM-DD");
     localStorage.setItem(`migration_prompted_${currentFormat}`, "true");
     setShowMigrationModal(false);
@@ -545,6 +614,12 @@ export default function MatrixPage() {
     onDelete: handleDeleteSelected,
   });
 
+  React.useEffect(() => {
+    if (!showMigrationModal) {
+      setRememberMigrationChoice(false);
+    }
+  }, [showMigrationModal]);
+
   const confirmTitle =
     pendingTaskAction?.type === "delete" ? "删除任务" : "推迟任务";
   const confirmMessage = pendingTaskAction
@@ -622,6 +697,17 @@ export default function MatrixPage() {
               <ListEnd className="h-4 w-4" />
               <span className="hidden sm:inline">一键迁移</span>
             </Button>
+            {migrationPreference ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={clearMigrationPreference}
+                className="flex items-center gap-2 border border-glass-border text-slate-300 hover:bg-white/10"
+              >
+                {"\u6e05\u9664\u8fc1\u79fb\u504f\u597d"}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"
@@ -858,6 +944,15 @@ export default function MatrixPage() {
                 </li>
               ))}
             </ul>
+            <label className="mt-4 flex items-center gap-2 text-xs text-slate-400">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border border-white/20 bg-transparent"
+                checked={rememberMigrationChoice}
+                onChange={(event) => setRememberMigrationChoice(event.target.checked)}
+              />
+              {"\u8bb0\u4f4f\u6211\u7684\u9009\u62e9"}
+            </label>
             <div className="mt-6 flex gap-3">
               <Button
                 type="button"
