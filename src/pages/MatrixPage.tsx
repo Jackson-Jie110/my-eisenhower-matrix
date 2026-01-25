@@ -87,6 +87,36 @@ const parseDeletedTaskEntries = (raw: string | null): DeletedTaskEntry[] => {
   return [];
 };
 
+const getFilterButtonClasses = (isActive: boolean) =>
+  cn(
+    "border border-white/10",
+    isActive
+      ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-500"
+      : "bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+  );
+
+const quadrantChipStyles: Record<QuadrantId, { base: string; active: string }> = {
+  q1: {
+    base: "bg-red-500/10 text-red-300 border border-red-500/20 hover:bg-red-500/20",
+    active:
+      "bg-red-500 text-white border border-red-500/40 shadow-lg shadow-red-500/20",
+  },
+  q2: {
+    base: "bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20",
+    active:
+      "bg-amber-500 text-white border border-amber-500/40 shadow-lg shadow-amber-500/20",
+  },
+  q3: {
+    base: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20",
+    active:
+      "bg-emerald-500 text-white border border-emerald-500/40 shadow-lg shadow-emerald-500/20",
+  },
+  q4: {
+    base: "bg-slate-800/60 text-slate-200 border border-white/10 hover:bg-slate-800",
+    active: "bg-slate-500 text-white border border-white/20 shadow-lg shadow-black/20",
+  },
+};
+
 function BacklogPanel({
   tasks,
   onRequestDelete,
@@ -1003,7 +1033,7 @@ export default function MatrixPage() {
             </div>
           </form>
 
-          <section className="flex flex-col gap-3 rounded-xl border border-glass-border bg-glass-100/40 p-3 backdrop-blur-md md:flex-row md:items-center md:justify-between">
+          <section className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#0B1121]/95 p-3 backdrop-blur-md md:flex-row md:items-center md:justify-between">
             <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
               <Input
                 placeholder={"\u641c\u7d22\u4efb\u52a1/\u5907\u6ce8..."}
@@ -1015,53 +1045,90 @@ export default function MatrixPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={statusFilter === "all" ? "secondary" : "ghost"}
+                  variant="ghost"
                   onClick={() => setStatusFilter("all")}
-                  className="border border-glass-border"
+                  className={cn("h-9 px-3 text-xs", getFilterButtonClasses(statusFilter === "all"))}
                 >
                   {"\u5168\u90e8"}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
-                  variant={statusFilter === "active" ? "secondary" : "ghost"}
+                  variant="ghost"
                   onClick={() => setStatusFilter("active")}
-                  className="border border-glass-border"
+                  className={cn(
+                    "h-9 px-3 text-xs",
+                    getFilterButtonClasses(statusFilter === "active")
+                  )}
                 >
                   {"\u672a\u5b8c\u6210"}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
-                  variant={statusFilter === "completed" ? "secondary" : "ghost"}
+                  variant="ghost"
                   onClick={() => setStatusFilter("completed")}
-                  className="border border-glass-border"
+                  className={cn(
+                    "h-9 px-3 text-xs",
+                    getFilterButtonClasses(statusFilter === "completed")
+                  )}
                 >
                   {"\u5df2\u5b8c\u6210"}
                 </Button>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={quadrantFilter}
-                onChange={(event) =>
-                  setQuadrantFilter(event.target.value as "all" | "backlog" | QuadrantId)
-                }
-                className="rounded-xl border border-glass-border bg-black/20 px-3 py-2 text-xs text-slate-200 outline-none"
-              >
-                <option value="all">{"\u6240\u6709\u8c61\u9650"}</option>
-                <option value="backlog">{"\u5f85\u529e\u6c60"}</option>
-                <option value="q1">Q1</option>
-                <option value="q2">Q2</option>
-                <option value="q3">Q3</option>
-                <option value="q4">Q4</option>
-              </select>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setQuadrantFilter("all")}
+                  className={cn(
+                    "h-9 px-3 text-xs",
+                    getFilterButtonClasses(quadrantFilter === "all")
+                  )}
+                >
+                  {"\u6240\u6709\u8c61\u9650"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setQuadrantFilter("backlog")}
+                  className={cn(
+                    "h-9 px-3 text-xs",
+                    getFilterButtonClasses(quadrantFilter === "backlog")
+                  )}
+                >
+                  {"\u5f85\u529e\u6c60"}
+                </Button>
+                {quadrantIds.map((id) => {
+                  const styles = quadrantChipStyles[id];
+                  const isActive = quadrantFilter === id;
+                  return (
+                    <Button
+                      key={id}
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setQuadrantFilter(id)}
+                      className={cn(
+                        "h-9 px-3 text-xs",
+                        isActive ? styles.active : styles.base
+                      )}
+                    >
+                      {id.toUpperCase()}
+                    </Button>
+                  );
+                })}
+              </div>
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
                 onClick={handleResetFilters}
-                className="border border-glass-border"
+                className={cn("h-9 px-3 text-xs", getFilterButtonClasses(false))}
               >
                 {"\u91cd\u7f6e"}
               </Button>
