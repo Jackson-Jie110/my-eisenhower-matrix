@@ -256,7 +256,7 @@ export default function MatrixPage() {
     console.warn(`🔍 [Migration Check] Start. Today: ${currentKey}`);
 
     if (localStorage.getItem(promptKey) === "true") {
-      console.warn("🛑 [Migration] Already prompted today (Flag exists). Skip.");
+      console.warn("🛑 [Migration] Already handled by user today. Skip.");
       return;
     }
 
@@ -273,9 +273,8 @@ export default function MatrixPage() {
 
         if (incomplete.length > 0) {
           console.warn(
-            "✅ [Migration] First time check passed. TRIGGERING MODAL & SETTING FLAG."
+            "✅ [Migration] Incomplete tasks found. SHOWING MODAL (Flag will be set on user interaction)."
           );
-          localStorage.setItem(promptKey, "true");
           setYesterdayTasks(incomplete);
           setShowMigrationModal(true);
         } else {
@@ -369,11 +368,15 @@ export default function MatrixPage() {
     if (yesterdayTasks.length > 0) {
       importTasks(yesterdayTasks);
     }
+    const currentFormat = dayjs(resolvedDate).format("YYYY-MM-DD");
+    localStorage.setItem(`migration_prompted_${currentFormat}`, "true");
     setShowMigrationModal(false);
     setYesterdayTasks([]);
   };
 
   const handleMigrationCancel = () => {
+    const currentFormat = dayjs(resolvedDate).format("YYYY-MM-DD");
+    localStorage.setItem(`migration_prompted_${currentFormat}`, "true");
     setShowMigrationModal(false);
     setYesterdayTasks([]);
   };
