@@ -1,5 +1,4 @@
 ﻿import React from "react";
-import useTaskStore from "../../hooks/useTaskStore";
 import type { QuadrantId, Task } from "../../types";
 import { Quadrant } from "./Quadrant";
 
@@ -16,18 +15,20 @@ const filterTasksByQuadrant = (tasks: Task[], quadrantId: QuadrantId) =>
   tasks.filter((task) => task.quadrantId === quadrantId);
 
 type MatrixGridProps = {
+  tasks: Task[];
   onRequestDelete: (task: Task) => void;
   onRequestSnooze: (task: Task) => void;
   selectedTaskId?: string | null;
+  isDragDisabled?: boolean;
 };
 
 export function MatrixGrid({
+  tasks,
   onRequestDelete,
   onRequestSnooze,
   selectedTaskId,
+  isDragDisabled,
 }: MatrixGridProps) {
-  const tasks = useTaskStore((state) => state.tasks);
-
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {quadrantOrder.map((quadrantId) => (
@@ -39,6 +40,7 @@ export function MatrixGrid({
           onRequestDelete={onRequestDelete}
           onRequestSnooze={onRequestSnooze}
           selectedTaskId={selectedTaskId}
+          isDragDisabled={isDragDisabled}
         />
       ))}
     </section>

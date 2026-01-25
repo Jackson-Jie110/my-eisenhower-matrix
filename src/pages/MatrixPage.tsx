@@ -60,11 +60,13 @@ function BacklogPanel({
   onRequestDelete,
   onRequestSnooze,
   selectedTaskId,
+  isFiltering,
 }: {
   tasks: Task[];
   onRequestDelete: (task: Task) => void;
   onRequestSnooze: (task: Task) => void;
   selectedTaskId?: string | null;
+  isFiltering?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: BACKLOG_ID });
 
@@ -86,7 +88,7 @@ function BacklogPanel({
       >
         <div className="flex flex-col gap-3">
           {tasks.length === 0 ? (
-            <p className="text-xs text-slate-400">暂无待办任务</p>
+            <p className="text-xs text-slate-400">{isFiltering ? "\u672a\u627e\u5230\u5339\u914d\u4efb\u52a1" : "\u6682\u65e0\u5f85\u529e\u4efb\u52a1"}</p>
           ) : (
             tasks.map((task, index) => (
               <TaskCard
@@ -98,6 +100,7 @@ function BacklogPanel({
                 onRequestDelete={onRequestDelete}
                 onRequestSnooze={onRequestSnooze}
                 isSelected={task.id === selectedTaskId}
+                isDragDisabled={Boolean(isFiltering)}
               />
             ))
           )}
@@ -139,6 +142,16 @@ export default function MatrixPage() {
   const [title, setTitle] = React.useState("");
   const [context, setContext] = React.useState("");
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
+  const [activeTaskWidth, setActiveTaskWidth] = React.useState<number | null>(
+    null
+  );
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<
+    "all" | "active" | "completed"
+  >("all");
+  const [quadrantFilter, setQuadrantFilter] = React.useState<
+    "all" | "backlog" | QuadrantId
+  >("all");
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
   const [showMigrationModal, setShowMigrationModal] = React.useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = React.useState(false);
@@ -151,6 +164,12 @@ export default function MatrixPage() {
   const prevIncompleteCount = React.useRef(0);
   const migrationCheckedDate = React.useRef<string | null>(null);
   const titleInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleResetFilters = React.useCallback(() => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setQuadrantFilter("all");
+  }, []);
 
   const resolvedDate = React.useMemo(() => {
     const dateParam = params.date;
@@ -203,9 +222,42 @@ export default function MatrixPage() {
     }
   }, [pendingTaskAction, showMigrationModal, showShortcutHelp]);
 
+  const normalizedQuery = React.useMemo(
+    () => searchQuery.trim().toLowerCase(),
+    [searchQuery]
+  );
+  const isFiltering =
+    normalizedQuery.length > 0 ||
+    statusFilter !== "all" ||
+    quadrantFilter !== "all";
+
+  const visibleTasks = React.useMemo(() => {
+    return tasks.filter((task) => {
+      if (normalizedQuery) {
+        const haystack = `${task.title} ${task.context ?? ""}`.toLowerCase();
+        if (!haystack.includes(normalizedQuery)) {
+          return false;
+        }
+      }
+      if (statusFilter === "active" && task.isCompleted) {
+        return false;
+      }
+      if (statusFilter === "completed" && !task.isCompleted) {
+        return false;
+      }
+      if (quadrantFilter === "backlog") {
+        return task.quadrantId == null;
+      }
+      if (quadrantFilter !== "all") {
+        return task.quadrantId === quadrantFilter;
+      }
+      return true;
+    });
+  }, [normalizedQuery, quadrantFilter, statusFilter, tasks]);
+
   const backlogTasks = React.useMemo(
-    () => tasks.filter((task) => task.quadrantId == null),
-    [tasks]
+    () => visibleTasks.filter((task) => task.quadrantId == null),
+    [visibleTasks]
   );
 
   const activeTask = React.useMemo(
@@ -251,11 +303,11 @@ export default function MatrixPage() {
     if (!selectedTaskId) {
       return;
     }
-    const selectedTask = tasks.find((task) => task.id === selectedTaskId);
+    const selectedTask = visibleTasks.find((task) => task.id === selectedTaskId);
     if (!selectedTask || selectedTask.quadrantId !== null) {
       setSelectedTaskId(null);
     }
-  }, [selectedTaskId, tasks]);
+  }, [selectedTaskId, visibleTasks]);
 
   React.useEffect(() => {
     loadTasksByDate(resolvedDate);
@@ -331,11 +383,19 @@ export default function MatrixPage() {
   };
 
   const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveTaskId(String(active.id));
+    const activeId = String(active.id);
+    setActiveTaskId(activeId);
+    if (typeof document !== "undefined") {
+      const element = document.getElementById(activeId);
+      setActiveTaskWidth(element ? element.offsetWidth : null);
+    } else {
+      setActiveTaskWidth(null);
+    }
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveTaskId(null);
+    setActiveTaskWidth(null);
     if (!over) {
       return;
     }
@@ -579,7 +639,10 @@ export default function MatrixPage() {
           collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => setActiveTaskId(null)}
+          onDragCancel={() => {
+            setActiveTaskId(null);
+            setActiveTaskWidth(null);
+          }}
         >
           <form
             onSubmit={handleSubmit}
@@ -603,22 +666,100 @@ export default function MatrixPage() {
             </div>
           </form>
 
+          <section className="flex flex-col gap-3 rounded-xl border border-glass-border bg-glass-100/40 p-3 backdrop-blur-md md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
+              <Input
+                placeholder={"\\u641c\\u7d22\\u4efb\\u52a1/\\u5907\\u6ce8..."}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="md:max-w-sm"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={statusFilter === "all" ? "secondary" : "ghost"}
+                  onClick={() => setStatusFilter("all")}
+                  className="border border-glass-border"
+                >
+                  {"\\u5168\\u90e8"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={statusFilter === "active" ? "secondary" : "ghost"}
+                  onClick={() => setStatusFilter("active")}
+                  className="border border-glass-border"
+                >
+                  {"\\u672a\\u5b8c\\u6210"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={statusFilter === "completed" ? "secondary" : "ghost"}
+                  onClick={() => setStatusFilter("completed")}
+                  className="border border-glass-border"
+                >
+                  {"\\u5df2\\u5b8c\\u6210"}
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={quadrantFilter}
+                onChange={(event) =>
+                  setQuadrantFilter(event.target.value as "all" | "backlog" | QuadrantId)
+                }
+                className="rounded-xl border border-glass-border bg-black/20 px-3 py-2 text-xs text-slate-200 outline-none"
+              >
+                <option value="all">{\"\\u6240\\u6709\\u8c61\\u9650\"}</option>
+                <option value="backlog">{\"\\u5f85\\u529e\\u6c60\"}</option>
+                <option value="q1">Q1</option>
+                <option value="q2">Q2</option>
+                <option value="q3">Q3</option>
+                <option value="q4">Q4</option>
+              </select>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleResetFilters}
+                className="border border-glass-border"
+              >
+                {"\\u91cd\\u7f6e"}
+              </Button>
+            </div>
+          </section>
+          {isFiltering ? (
+            <p className="text-xs text-slate-400">
+              {"\\u8fc7\\u6ee4\\u6a21\\u5f0f\\u4e0b\\u5df2\\u7981\\u7528\\u62d6\\u62fd\\u6392\\u5e8f"}
+            </p>
+          ) : null}
+
           <BacklogPanel
             tasks={backlogTasks}
             onRequestDelete={requestTaskDelete}
             onRequestSnooze={requestTaskSnooze}
             selectedTaskId={selectedTaskId}
+            isFiltering={isFiltering}
           />
 
           <MatrixGrid
+            tasks={visibleTasks}
             onRequestDelete={requestTaskDelete}
             onRequestSnooze={requestTaskSnooze}
             selectedTaskId={selectedTaskId}
+            isDragDisabled={isFiltering}
           />
 
           <DragOverlay dropAnimation={null}>
             {activeTask ? (
-              <div className="w-[320px] opacity-80 cursor-grabbing">
+              <div
+                className="opacity-80 cursor-grabbing"
+                style={{
+                  width: activeTaskWidth ? `${activeTaskWidth}px` : "auto",
+                }}
+              >
                 <TaskCard
                   task={activeTask}
                   index={0}

@@ -13,6 +13,7 @@ type QuadrantProps = {
   onRequestDelete: (task: Task) => void;
   onRequestSnooze: (task: Task) => void;
   selectedTaskId?: string | null;
+  isDragDisabled?: boolean;
 };
 
 const quadrantStyles: Record<QuadrantId, { title: string }> = {
@@ -37,6 +38,7 @@ export function Quadrant({
   onRequestDelete,
   onRequestSnooze,
   selectedTaskId,
+  isDragDisabled,
 }: QuadrantProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: quadrantId,
@@ -72,6 +74,7 @@ export function Quadrant({
               onRequestDelete={onRequestDelete}
               onRequestSnooze={onRequestSnooze}
               isSelected={task.id === selectedTaskId}
+              isDragDisabled={isDragDisabled}
             />
           ))}
         </div>
