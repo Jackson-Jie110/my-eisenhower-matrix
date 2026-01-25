@@ -1009,7 +1009,7 @@ export default function MatrixPage() {
                 placeholder={"\u641c\u7d22\u4efb\u52a1/\u5907\u6ce8..."}
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="md:max-w-sm bg-black/40 text-slate-50 placeholder:text-slate-300"
+                className="md:max-w-sm border border-white/10 bg-slate-900/80 text-slate-100 placeholder:text-slate-500 backdrop-blur-md"
               />
               <div className="flex flex-wrap gap-2">
                 <Button
