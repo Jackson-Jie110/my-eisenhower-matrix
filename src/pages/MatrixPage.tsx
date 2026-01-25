@@ -755,7 +755,7 @@ export default function MatrixPage() {
           <section className="flex flex-col gap-3 rounded-xl border border-glass-border bg-glass-100/40 p-3 backdrop-blur-md md:flex-row md:items-center md:justify-between">
             <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
               <Input
-                placeholder={"\\u641c\\u7d22\\u4efb\\u52a1/\\u5907\\u6ce8..."}
+                placeholder={"\u641c\u7d22\u4efb\u52a1/\u5907\u6ce8..."}
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="md:max-w-sm"
@@ -768,7 +768,7 @@ export default function MatrixPage() {
                   onClick={() => setStatusFilter("all")}
                   className="border border-glass-border"
                 >
-                  {"\\u5168\\u90e8"}
+                  {"\u5168\u90e8"}
                 </Button>
                 <Button
                   type="button"
@@ -777,7 +777,7 @@ export default function MatrixPage() {
                   onClick={() => setStatusFilter("active")}
                   className="border border-glass-border"
                 >
-                  {"\\u672a\\u5b8c\\u6210"}
+                  {"\u672a\u5b8c\u6210"}
                 </Button>
                 <Button
                   type="button"
@@ -786,7 +786,7 @@ export default function MatrixPage() {
                   onClick={() => setStatusFilter("completed")}
                   className="border border-glass-border"
                 >
-                  {"\\u5df2\\u5b8c\\u6210"}
+                  {"\u5df2\u5b8c\u6210"}
                 </Button>
               </div>
             </div>
@@ -798,8 +798,8 @@ export default function MatrixPage() {
                 }
                 className="rounded-xl border border-glass-border bg-black/20 px-3 py-2 text-xs text-slate-200 outline-none"
               >
-                <option value="all">{\"\\u6240\\u6709\\u8c61\\u9650\"}</option>
-                <option value="backlog">{\"\\u5f85\\u529e\\u6c60\"}</option>
+                <option value="all">{"\u6240\u6709\u8c61\u9650"}</option>
+                <option value="backlog">{"\u5f85\u529e\u6c60"}</option>
                 <option value="q1">Q1</option>
                 <option value="q2">Q2</option>
                 <option value="q3">Q3</option>
@@ -812,13 +812,13 @@ export default function MatrixPage() {
                 onClick={handleResetFilters}
                 className="border border-glass-border"
               >
-                {"\\u91cd\\u7f6e"}
+                {"\u91cd\u7f6e"}
               </Button>
             </div>
           </section>
           {isFiltering ? (
             <p className="text-xs text-slate-400">
-              {"\\u8fc7\\u6ee4\\u6a21\\u5f0f\\u4e0b\\u5df2\\u7981\\u7528\\u62d6\\u62fd\\u6392\\u5e8f"}
+              {"\u8fc7\u6ee4\u6a21\u5f0f\u4e0b\u5df2\u7981\u7528\u62d6\u62fd\u6392\u5e8f"}
             </p>
           ) : null}
 
