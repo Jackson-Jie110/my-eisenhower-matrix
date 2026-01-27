@@ -1120,7 +1120,7 @@ export default function MatrixPage() {
             </div>
           </form>
 
-          <section className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#0B1121]/95 p-3 backdrop-blur-md md:flex-row md:items-center md:justify-between">
+          <section className="relative z-20 flex flex-col gap-3 rounded-xl border border-white/10 bg-[#0B1121]/95 p-3 backdrop-blur-md md:flex-row md:items-center md:justify-between">
             <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
               <Input
                 placeholder={"\u641c\u7d22\u4efb\u52a1/\u5907\u6ce8..."}
