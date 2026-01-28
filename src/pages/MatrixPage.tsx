@@ -32,6 +32,7 @@ import { MatrixGrid } from "../components/Matrix/MatrixGrid";
 import { TaskCard } from "../components/Task/TaskCard";
 import { Button } from "../components/ui/Button";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
+import { DatePicker } from "../components/ui/DatePicker";
 import { Input } from "../components/ui/Input";
 import { ParticlesBackground } from "../components/ui/ParticlesBackground";
 import { cn } from "../lib/utils";
@@ -1044,6 +1045,20 @@ export default function MatrixPage() {
             <p className="text-sm text-slate-400">{currentDate}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <DatePicker
+              value={dayjs(resolvedDate).toDate()}
+              onChange={(next) => {
+                if (!next) {
+                  return;
+                }
+                const targetDate = dayjs(next).format("YYYY-MM-DD");
+                if (targetDate === resolvedDate) {
+                  return;
+                }
+                navigate(`/matrix/${targetDate}`);
+              }}
+              placeholder="选择日期"
+            />
             <Button
               type="button"
               variant="ghost"
