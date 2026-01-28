@@ -588,10 +588,21 @@ export default function MatrixPage() {
       if (!selectedTaskId) {
         return;
       }
+
+      const currentIndex = backlogTasks.findIndex(
+        (task) => task.id === selectedTaskId
+      );
+      const nextTask =
+        currentIndex >= 0
+          ? backlogTasks[currentIndex + 1] ?? backlogTasks[currentIndex - 1]
+          : backlogTasks[0];
+      const nextSelectedTaskId = nextTask?.id ?? null;
+
       updateTaskQuadrant(selectedTaskId, quadrantId);
-      setSelectedTaskId(null);
+      setSelectedTaskId(nextSelectedTaskId);
     },
     [
+      backlogTasks,
       isQuadrantDropdownOpen,
       pendingTaskAction,
       selectedTaskId,
