@@ -4,7 +4,6 @@ import "dayjs/locale/zh-cn";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
-  CalendarPlus,
   ChevronDown,
   Download,
   LayoutDashboard,
@@ -18,6 +17,7 @@ import useTaskStore from "../hooks/useTaskStore";
 import type { Task } from "../types";
 import { Button } from "../components/ui/Button";
 import { ConfirmModal } from "../components/ui/ConfirmModal";
+import { DatePicker } from "../components/ui/DatePicker";
 import { ParticlesBackground } from "../components/ui/ParticlesBackground";
 
 const pageMotion = {
@@ -142,8 +142,7 @@ const ArchiveCard = ({
 
 export default function ArchivePage() {
   const [entries, setEntries] = React.useState<DateEntry[]>([]);
-  const [supportsPicker, setSupportsPicker] = React.useState(false);
-  const [pendingDate, setPendingDate] = React.useState("");
+  const [pendingDate, setPendingDate] = React.useState<Date | undefined>();
   const [pendingDeleteDate, setPendingDeleteDate] = React.useState<
     string | null
   >(null);
@@ -153,15 +152,7 @@ export default function ArchivePage() {
   const today = dayjs().format("YYYY-MM-DD");
   const navigate = useNavigate();
   const softDeleteArchive = useTaskStore((state) => state.softDeleteArchive);
-  const dateInputRef = React.useRef<HTMLInputElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-
-  React.useEffect(() => {
-    setSupportsPicker(
-      typeof HTMLInputElement !== "undefined" &&
-        "showPicker" in HTMLInputElement.prototype
-    );
-  }, []);
 
   React.useEffect(() => {
     let keys = Object.keys(localStorage).filter((key) =>
@@ -234,30 +225,11 @@ export default function ArchivePage() {
     });
   }, [sortedGroups]);
 
-  const handleOpenPicker = () => {
-    const input = dateInputRef.current;
-    if (!input) {
-      return;
-    }
-    input.showPicker?.();
-    if (!supportsPicker) {
-      input.click();
-    }
-  };
-
-  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    if (!value) {
-      return;
-    }
-    setPendingDate(value);
-  };
-
   const handleNavigateDate = () => {
     if (!pendingDate) {
       return;
     }
-    navigate(`/matrix/${pendingDate}`);
+    navigate(`/matrix/${dayjs(pendingDate).format("YYYY-MM-DD")}`);
   };
 
   const isConfirmSuppressed = React.useCallback((featureKey: string) => {
@@ -424,27 +396,11 @@ export default function ArchivePage() {
               className="hidden"
               onChange={handleImportFile}
             />
-            <div className="relative">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleOpenPicker}
-                className="flex items-center gap-2"
-              >
-                <CalendarPlus className="h-4 w-4" />
-                新建 / 穿梭
-              </Button>
-              <input
-                ref={dateInputRef}
-                type="date"
-                className={
-                  supportsPicker
-                    ? "invisible absolute inset-0 pointer-events-none"
-                    : "absolute inset-0 opacity-0"
-                }
-                onChange={handleDateChange}
-              />
-            </div>
+            <DatePicker
+              value={pendingDate}
+              onChange={setPendingDate}
+              placeholder="新建 / 穿梭"
+            />
             <Button
               type="button"
               variant="ghost"
