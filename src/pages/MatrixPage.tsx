@@ -1046,16 +1046,18 @@ export default function MatrixPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <DatePicker
-              value={dayjs(resolvedDate).toDate()}
-              onChange={(next) => {
-                if (!next) {
+              date={dayjs(resolvedDate).toDate()}
+              setDate={(newDate) => {
+                console.log("DatePicker clicked. New date:", newDate);
+                if (!newDate) {
                   return;
                 }
-                const targetDate = dayjs(next).format("YYYY-MM-DD");
-                if (targetDate === resolvedDate) {
-                  return;
+
+                const targetStr = dayjs(newDate).format("YYYY-MM-DD");
+                if (targetStr !== resolvedDate) {
+                  console.log("Navigating to:", targetStr);
+                  navigate(`/matrix/${targetStr}`);
                 }
-                navigate(`/matrix/${targetDate}`);
               }}
               placeholder="选择日期"
             />
