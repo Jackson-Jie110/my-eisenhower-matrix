@@ -37,14 +37,15 @@ const dayPickerClassNames: NonNullable<
   weekday: "w-9 pb-1 text-center text-[0.75rem] font-medium text-slate-500",
   weeks: "",
   week: "",
-  day: "h-9 w-9 p-0 text-center align-middle",
+  day: "h-9 w-9 p-0 text-center align-middle cursor-pointer pointer-events-auto relative z-10",
   day_button:
-    "h-9 w-9 cursor-pointer pointer-events-auto flex items-center justify-center rounded-full bg-transparent p-0 text-sm font-normal text-slate-300 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue focus-visible:ring-offset-0 disabled:pointer-events-none disabled:text-slate-600 disabled:opacity-50",
+    "h-9 w-9 cursor-pointer pointer-events-auto relative z-10 flex items-center justify-center rounded-full bg-transparent p-0 text-sm font-normal text-slate-300 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue focus-visible:ring-offset-0 disabled:pointer-events-none disabled:text-slate-600 disabled:opacity-50",
   selected:
     "[&>button]:bg-blue-600 [&>button]:text-white [&>button]:shadow-lg [&>button]:shadow-blue-500/30 [&>button]:font-bold [&>button]:hover:bg-blue-700",
   today:
     "[&>button]:text-blue-400 [&>button]:font-semibold [&>button]:relative [&>button]:after:absolute [&>button]:after:bottom-1 [&>button]:after:left-1/2 [&>button]:after:h-1 [&>button]:after:w-1 [&>button]:after:-translate-x-1/2 [&>button]:after:rounded-full [&>button]:after:bg-blue-400",
-  outside: "[&>button]:text-slate-600 [&>button]:opacity-50",
+  outside:
+    "cursor-pointer pointer-events-auto relative z-10 [&>button]:text-slate-600 [&>button]:opacity-50 [&>button]:cursor-pointer [&>button]:pointer-events-auto [&>button]:hover:bg-transparent",
   disabled: "[&>button]:text-slate-600 [&>button]:opacity-50",
   hidden: "invisible",
   range_middle: "[&>button]:bg-slate-800 [&>button]:text-slate-100",
@@ -175,6 +176,7 @@ export function DatePicker({
       ref={popoverRef}
       role="dialog"
       aria-label="选择日期"
+      id="custom-datepicker"
       className="z-[9999] rounded-xl bg-slate-900/95 p-4 shadow-2xl backdrop-blur-xl border border-white/10 pointer-events-auto"
       style={{ isolation: "isolate", ...popoverStyle }}
     >
