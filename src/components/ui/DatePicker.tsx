@@ -17,7 +17,7 @@ type DatePickerProps = {
 
 const dayPickerClassNames: NonNullable<React.ComponentProps<typeof DayPicker>["classNames"]> =
   {
-    root: "p-2",
+    root: "p-2 pointer-events-auto",
     months: "flex flex-col",
     month: "space-y-4",
     month_caption: "relative flex items-center justify-center pt-1",
@@ -35,7 +35,7 @@ const dayPickerClassNames: NonNullable<React.ComponentProps<typeof DayPicker>["c
     week: "",
     day: "h-9 w-9 p-0 text-center align-middle focus-within:relative focus-within:z-20",
     day_button:
-      "h-9 w-9 rounded-full bg-transparent p-0 text-sm font-normal text-slate-300 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue focus-visible:ring-offset-0 disabled:pointer-events-none disabled:text-slate-600 disabled:opacity-50",
+      "h-9 w-9 cursor-pointer pointer-events-auto rounded-full bg-transparent p-0 text-sm font-normal text-slate-300 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-blue focus-visible:ring-offset-0 disabled:pointer-events-none disabled:text-slate-600 disabled:opacity-50",
     selected:
       "[&>button]:bg-blue-600 [&>button]:text-white [&>button]:shadow-lg [&>button]:shadow-blue-500/30 [&>button]:font-bold [&>button]:hover:bg-blue-700",
     today:
@@ -124,7 +124,7 @@ export function DatePicker({
         <div
           role="dialog"
           aria-label="选择日期"
-          className="absolute left-0 top-full z-50 mt-2 rounded-xl bg-slate-900/95 p-4 shadow-2xl backdrop-blur-xl border border-white/10"
+          className="absolute left-0 top-full z-[9999] mt-2 rounded-xl bg-slate-900/95 p-4 shadow-2xl backdrop-blur-xl border border-white/10 pointer-events-auto"
         >
           <DayPicker
             mode="single"
